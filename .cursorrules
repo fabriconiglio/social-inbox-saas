@@ -1,0 +1,807 @@
+# Reglas de Desarrollo - MessageHub
+
+## 🎯 Configuración del Proyecto
+
+### Información General
+- **Proyecto**: MessageHub - SaaS de gestión de mensajes de redes sociales
+- **Stack**: Next.js 15, TypeScript, Prisma, PostgreSQL, Redis, BullMQ
+- **Arquitectura**: Multi-tenant con roles (OWNER, ADMIN, AGENT, VIEWER)
+- **Usuario**: Fabri (desarrollador principal)
+
+---
+
+## 🔐 Seguridad y Autenticación
+
+### NextAuth v5
+- SIEMPRE usar `requireAuth()` en server actions antes de cualquier operación
+- SIEMPRE verificar permisos con `checkTenantAccess()` para operaciones multi-tenant
+- NUNCA exponer credenciales en logs o respuestas de API
+- SIEMPRE validar que el usuario tiene acceso al tenant antes de cualquier query
+- Usar JWT con secret de mínimo 32 caracteres
+- NUNCA confiar en datos del cliente sin validación server-side
+
+### Roles y Permisos
+```typescript
+// Jerarquía de roles (de mayor a menor):
+OWNER > ADMIN > AGENT > VIEWER
+
+// Reglas de permisos:
+- OWNER: Acceso total, puede eliminar tenant
+- ADMIN: Gestión completa excepto eliminar tenant
+- AGENT: Solo sus conversaciones asignadas, puede enviar mensajes
+- VIEWER: Solo lectura, NO puede enviar mensajes
+
+// SIEMPRE verificar permisos en server actions:
+if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
+  return { error: "Unauthorized" }
+}
+```
+
+### Validación de Datos
+- SIEMPRE usar Zod para validar inputs de usuario
+- SIEMPRE sanitizar datos antes de guardar en BD
+- NUNCA confiar en datos del cliente
+- Validar tipos, longitudes, formatos y rangos
+- Usar prepared statements (Prisma lo hace automáticamente)
+
+---
+
+## 🏗️ Arquitectura y Patrones
+
+### Multi-Tenancy
+```typescript
+// REGLA CRÍTICA: SIEMPRE filtrar por tenantId
+// ❌ MAL - Expone datos de otros tenants
+const channels = await prisma.channel.findMany()
+
+// ✅ BIEN - Filtra por tenant
+const channels = await prisma.channel.findMany({
+  where: {
+    local: {
+      tenantId: tenantId
+    }
+  }
+})
+
+// SIEMPRE verificar ownership antes de operaciones:
+const channel = await prisma.channel.findUnique({
+  where: { id: channelId },
+  include: { local: true }
+})
+
+if (channel.local.tenantId !== tenantId) {
+  return { error: "Unauthorized" }
+}
+```
+
+### Server Actions
+```typescript
+// Estructura estándar de server action:
+export async function myAction(data: MyData) {
+  try {
+    // 1. Autenticación
+    const user = await requireAuth()
+    
+    // 2. Autorización
+    const membership = await checkTenantAccess(user.id!, data.tenantId)
+    if (!membership) {
+      return { error: "Unauthorized" }
+    }
+    
+    // 3. Validación de permisos específicos
+    if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
+      return { error: "Insufficient permissions" }
+    }
+    
+    // 4. Validación de datos
+    const validated = mySchema.safeParse(data)
+    if (!validated.success) {
+      return { error: "Invalid data" }
+    }
+    
+    // 5. Verificar ownership de recursos
+    const resource = await prisma.resource.findUnique({
+      where: { id: data.resourceId },
+      include: { tenant: true }
+    })
+    
+    if (resource.tenantId !== data.tenantId) {
+      return { error: "Resource not found" }
+    }
+    
+    // 6. Operación principal
+    const result = await prisma.resource.update({ ... })
+    
+    // 7. Revalidar cache
+    revalidatePath(`/app/${data.tenantId}/path`)
+    
+    // 8. Retornar resultado
+    return { success: true, data: result }
+    
+  } catch (error) {
+    console.error("[Action Name] Error:", error)
+    return { error: "Operation failed" }
+  }
+}
+```
+
+### Componentes Client vs Server
+
+```typescript
+// Server Components (por defecto):
+// - Fetch de datos
+// - Acceso directo a BD
+// - No necesitan "use client"
+// - Mejor performance y SEO
+
+// Client Components ("use client"):
+// - Interactividad (onClick, onChange, etc)
+// - Hooks (useState, useEffect, etc)
+// - Navegación (useRouter, usePathname)
+// - Context (useContext)
+
+// ❌ MAL - Server component con interactividad
+export default function MyPage() {
+  const [state, setState] = useState() // Error!
+  return <button onClick={() => {}}>Click</button>
+}
+
+// ✅ BIEN - Separar responsabilidades
+// page.tsx (Server Component)
+export default async function MyPage() {
+  const data = await fetchData()
+  return <MyClientComponent data={data} />
+}
+
+// my-client-component.tsx (Client Component)
+"use client"
+export function MyClientComponent({ data }) {
+  const [state, setState] = useState()
+  return <button onClick={() => setState(...)}>Click</button>
+}
+```
+
+---
+
+## 💾 Base de Datos y Prisma
+
+### Queries Optimizadas
+```typescript
+// SIEMPRE usar select para limitar campos
+// ❌ MAL - Trae todos los campos
+const users = await prisma.user.findMany()
+
+// ✅ BIEN - Solo campos necesarios
+const users = await prisma.user.findMany({
+  select: {
+    id: true,
+    name: true,
+    email: true
+  }
+})
+
+// SIEMPRE usar índices en where clauses
+// Los índices están definidos en schema.prisma con @@index
+
+// NUNCA usar include y select juntos
+// ❌ MAL
+const channel = await prisma.channel.findMany({
+  include: { local: true },
+  select: { id: true } // Error!
+})
+
+// ✅ BIEN - Solo uno
+const channel = await prisma.channel.findMany({
+  select: {
+    id: true,
+    local: {
+      select: { name: true }
+    }
+  }
+})
+```
+
+### Transacciones
+```typescript
+// Para operaciones múltiples relacionadas:
+await prisma.$transaction(async (tx) => {
+  const tenant = await tx.tenant.create({ ... })
+  const local = await tx.local.create({ ... })
+  const membership = await tx.membership.create({ ... })
+  return { tenant, local, membership }
+})
+
+// NUNCA hacer queries dependientes sin transacción
+// si una falla, las otras quedan inconsistentes
+```
+
+### Migraciones
+```bash
+# SIEMPRE crear migraciones para cambios de schema
+npm run db:migrate
+
+# NUNCA usar db:push en producción
+# SOLO usar db:push en desarrollo
+
+# SIEMPRE revisar la migración generada antes de aplicar
+# Verificar que no borra datos importantes
+```
+
+---
+
+## 🎨 Frontend y UI
+
+### Componentes shadcn/ui
+```typescript
+// SIEMPRE usar componentes de /components/ui/
+// NO crear componentes UI desde cero
+
+// SIEMPRE usar las variantes definidas
+<Button variant="outline" size="sm">Click</Button>
+
+// SIEMPRE usar className para estilos adicionales
+<Button className="mt-4">Click</Button>
+
+// NUNCA modificar componentes de /components/ui/ directamente
+// Si necesitas customización, crea un wrapper
+```
+
+### Tailwind CSS
+```typescript
+// SIEMPRE usar clases de Tailwind
+// NO usar CSS inline o archivos CSS custom
+
+// ✅ BIEN
+<div className="flex items-center gap-4 rounded-lg border p-4">
+
+// ❌ MAL
+<div style={{ display: 'flex', gap: '16px' }}>
+
+// Usar dark mode con prefijo dark:
+<div className="bg-white dark:bg-gray-900">
+
+// Usar responsive con prefijos md:, lg:
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+```
+
+### Formularios
+```typescript
+// SIEMPRE validar en cliente Y servidor
+// Cliente: UX inmediata
+// Servidor: Seguridad real
+
+// SIEMPRE usar FormData o estado controlado
+const [value, setValue] = useState("")
+
+// SIEMPRE deshabilitar botones durante submit
+<Button disabled={isSubmitting}>
+  {isSubmitting ? "Guardando..." : "Guardar"}
+</Button>
+
+// SIEMPRE mostrar feedback con toast
+import { toast } from "sonner"
+toast.success("Operación exitosa")
+toast.error("Error al guardar")
+```
+
+### Estados de Carga
+```typescript
+// SIEMPRE mostrar estados de carga
+// - Skeleton para listas
+// - Spinner para operaciones
+// - Texto en botones
+
+// ✅ BIEN
+{isLoading ? (
+  <Skeleton className="h-20 w-full" />
+) : (
+  <DataComponent data={data} />
+)}
+
+// SIEMPRE usar Suspense para async components
+<Suspense fallback={<LoadingSkeleton />}>
+  <AsyncComponent />
+</Suspense>
+```
+
+---
+
+## 🔄 Manejo de Errores
+
+### Try-Catch
+```typescript
+// SIEMPRE usar try-catch en server actions
+try {
+  // operación
+} catch (error) {
+  console.error("[Context] Error:", error)
+  return { error: "User-friendly message" }
+}
+
+// NUNCA exponer detalles técnicos al usuario
+// ❌ MAL
+return { error: error.message } // Puede exponer info sensible
+
+// ✅ BIEN
+return { error: "Failed to save data" }
+```
+
+### Error Boundaries
+```typescript
+// SIEMPRE tener error boundaries en páginas críticas
+// Next.js usa error.tsx automáticamente
+
+// app/[tenantId]/error.tsx
+'use client'
+export default function Error({ error, reset }) {
+  return (
+    <div>
+      <h2>Algo salió mal</h2>
+      <button onClick={reset}>Reintentar</button>
+    </div>
+  )
+}
+```
+
+---
+
+## 🚀 Performance
+
+### Optimizaciones
+```typescript
+// SIEMPRE usar React.memo para componentes pesados
+export const HeavyComponent = React.memo(({ data }) => {
+  // render pesado
+})
+
+// SIEMPRE usar useMemo para cálculos costosos
+const expensiveValue = useMemo(() => {
+  return heavyCalculation(data)
+}, [data])
+
+// SIEMPRE usar useCallback para funciones en props
+const handleClick = useCallback(() => {
+  doSomething()
+}, [dependency])
+
+// NUNCA hacer queries en loops
+// ❌ MAL
+for (const item of items) {
+  await prisma.item.findUnique({ where: { id: item.id } })
+}
+
+// ✅ BIEN
+const ids = items.map(i => i.id)
+const results = await prisma.item.findMany({
+  where: { id: { in: ids } }
+})
+```
+
+### Imágenes
+```typescript
+// SIEMPRE usar next/image
+import Image from "next/image"
+
+<Image
+  src="/image.jpg"
+  alt="Description"
+  width={500}
+  height={300}
+  priority // Para above-the-fold
+/>
+
+// NUNCA usar <img> directamente
+```
+
+### Caching
+```typescript
+// SIEMPRE usar revalidatePath después de mutaciones
+import { revalidatePath } from "next/cache"
+
+await prisma.channel.update({ ... })
+revalidatePath(`/app/${tenantId}/channels`)
+
+// SIEMPRE usar cache en fetch cuando sea apropiado
+fetch(url, { next: { revalidate: 3600 } }) // 1 hora
+```
+
+---
+
+## 📝 Código Limpio
+
+### Nomenclatura
+```typescript
+// Variables y funciones: camelCase
+const userName = "John"
+function getUserData() {}
+
+// Componentes y Tipos: PascalCase
+interface UserData {}
+function UserCard() {}
+
+// Constantes: UPPER_SNAKE_CASE
+const MAX_RETRIES = 3
+const API_BASE_URL = "https://api.example.com"
+
+// Archivos:
+// - Componentes: kebab-case.tsx (user-card.tsx)
+// - Utilidades: kebab-case.ts (auth-utils.ts)
+// - Server Actions: kebab-case.ts (channels.ts)
+
+// SIEMPRE usar nombres descriptivos
+// ❌ MAL
+const d = new Date()
+const fn = () => {}
+
+// ✅ BIEN
+const createdAt = new Date()
+const handleSubmit = () => {}
+```
+
+### Comentarios
+```typescript
+// SIEMPRE comentar lógica compleja
+// Calcular SLA considerando horarios de negocio
+const slaStatus = calculateSLA(thread, config)
+
+// SIEMPRE comentar "por qué", no "qué"
+// ❌ MAL
+// Incrementar contador
+counter++
+
+// ✅ BIEN
+// Incrementar para evitar race condition en concurrent requests
+counter++
+
+// SIEMPRE usar JSDoc para funciones públicas
+/**
+ * Conecta un nuevo canal de mensajería
+ * @param data - Configuración del canal
+ * @returns Promise con resultado de la operación
+ */
+export async function connectChannel(data: ConnectChannelData) {}
+```
+
+### Organización de Imports
+```typescript
+// Orden de imports:
+// 1. React y Next.js
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+
+// 2. Librerías externas
+import { toast } from "sonner"
+
+// 3. Componentes UI
+import { Button } from "@/components/ui/button"
+import { Dialog } from "@/components/ui/dialog"
+
+// 4. Componentes propios
+import { ChannelCard } from "@/components/channels/channel-card"
+
+// 5. Utilidades y tipos
+import { cn } from "@/lib/utils"
+import type { Channel } from "@prisma/client"
+
+// 6. Iconos (al final)
+import { Plus, Settings } from "lucide-react"
+```
+
+### Funciones
+```typescript
+// SIEMPRE mantener funciones pequeñas (< 50 líneas)
+// Si es más grande, dividir en funciones más pequeñas
+
+// SIEMPRE un solo nivel de abstracción por función
+// ❌ MAL - Mezcla niveles
+function processUser() {
+  const user = await db.user.find() // bajo nivel
+  validateUser(user) // alto nivel
+  const x = user.name.toLowerCase() // bajo nivel
+}
+
+// ✅ BIEN - Mismo nivel
+async function processUser() {
+  const user = await getUser()
+  validateUser(user)
+  normalizeUser(user)
+}
+
+// SIEMPRE retornar early para evitar nesting
+// ❌ MAL
+function process(data) {
+  if (data) {
+    if (data.valid) {
+      if (data.active) {
+        // código
+      }
+    }
+  }
+}
+
+// ✅ BIEN
+function process(data) {
+  if (!data) return
+  if (!data.valid) return
+  if (!data.active) return
+  // código
+}
+```
+
+---
+
+## 🧪 Testing (Futuro)
+
+### Estructura de Tests
+```typescript
+// Unit tests para:
+// - Utilidades (sla.ts, utils.ts)
+// - Adapters (parsing de webhooks)
+// - Validaciones (schemas de Zod)
+
+// Integration tests para:
+// - Server actions
+// - API routes
+// - Webhook handlers
+
+// E2E tests para:
+// - Flujos críticos (login, enviar mensaje, asignar thread)
+// - Casos de uso principales
+
+// SIEMPRE mockear servicios externos
+// SIEMPRE limpiar BD después de tests
+// NUNCA usar datos de producción en tests
+```
+
+---
+
+## 🔌 Adapters de Canales
+
+### Implementación
+```typescript
+// SIEMPRE implementar interface ChannelAdapter
+export class MyAdapter implements ChannelAdapter {
+  type = "MY_CHANNEL"
+  
+  async ingestWebhook(payload: any, channelId: string): Promise<MessageDTO | null> {
+    // Parsear webhook
+  }
+  
+  async sendMessage(channelId: string, message: SendMessageDTO): Promise<Result> {
+    // Enviar mensaje
+  }
+  
+  async listThreads(channelId: string): Promise<ThreadDTO[]> {
+    // Listar conversaciones
+  }
+  
+  verifyWebhook(payload: any, signature: string): boolean {
+    // Verificar firma HMAC
+  }
+}
+
+// SIEMPRE obtener credenciales de channel.meta
+const channel = await prisma.channel.findUnique({ where: { id: channelId } })
+const { accessToken, pageId } = channel.meta
+
+// SIEMPRE manejar errores de API externa
+try {
+  const response = await fetch(apiUrl, { ... })
+  if (!response.ok) {
+    return { success: false, error: `API error: ${response.status}` }
+  }
+} catch (error) {
+  return { success: false, error: "Network error" }
+}
+
+// SIEMPRE usar idempotencia con externalId
+// Evita duplicados si el webhook se reenvía
+```
+
+---
+
+## 🔄 Queue y Workers (BullMQ)
+
+### Jobs
+```typescript
+// SIEMPRE encolar operaciones asíncronas
+await messageQueue.add("send-message", {
+  channelId,
+  messageId,
+  message
+})
+
+// SIEMPRE implementar retry logic
+{
+  attempts: 3,
+  backoff: {
+    type: 'exponential',
+    delay: 2000
+  }
+}
+
+// SIEMPRE actualizar estado en BD
+if (result.success) {
+  await prisma.message.update({
+    where: { id: messageId },
+    data: { deliveredAt: new Date() }
+  })
+} else {
+  await prisma.message.update({
+    where: { id: messageId },
+    data: { failedReason: result.error }
+  })
+}
+```
+
+---
+
+## 📊 Logging y Monitoreo
+
+### Logs
+```typescript
+// SIEMPRE usar prefijos descriptivos
+console.log("[Channel Connect] Creating new channel")
+console.error("[Send Message] Failed to send:", error)
+
+// SIEMPRE loggear operaciones importantes
+console.log("[Auth] User logged in:", user.email)
+console.log("[Webhook] Message received from:", channelId)
+
+// NUNCA loggear información sensible
+// ❌ MAL
+console.log("Access token:", token)
+console.log("Password:", password)
+
+// ✅ BIEN
+console.log("Token length:", token?.length)
+console.log("User authenticated")
+```
+
+---
+
+## 🌐 Internacionalización
+
+### Idioma
+```typescript
+// SIEMPRE usar español en:
+// - Textos de UI
+// - Mensajes de error para usuarios
+// - Comentarios en código
+// - Nombres de variables (cuando tenga sentido)
+
+// Inglés solo para:
+// - Nombres de funciones y componentes
+// - Código técnico
+// - Librerías y frameworks
+
+// ✅ BIEN
+const nombreUsuario = user.name
+toast.error("Error al guardar los cambios")
+// Validar permisos del usuario
+
+// ❌ MAL (mezclar idiomas)
+const userName = user.name
+toast.error("Failed to save changes")
+// Validate user permissions
+```
+
+---
+
+## 🚫 Anti-Patrones a Evitar
+
+### NUNCA hacer esto:
+```typescript
+// ❌ Queries sin filtro de tenant
+const data = await prisma.channel.findMany()
+
+// ❌ Confiar en datos del cliente
+const { tenantId } = req.body // Usuario puede manipular esto
+
+// ❌ Usar any sin necesidad
+function process(data: any) {} // Pierde type safety
+
+// ❌ Mutar props directamente
+props.data.push(item) // Props son inmutables
+
+// ❌ Usar índices como keys en listas
+{items.map((item, i) => <div key={i}>{item}</div>)}
+
+// ❌ Hacer fetch en useEffect sin cleanup
+useEffect(() => {
+  fetch(url).then(setData)
+}, []) // Memory leak si componente se desmonta
+
+// ❌ Hardcodear valores
+const apiUrl = "https://api.example.com" // Usar env vars
+
+// ❌ Catch sin manejo
+try { ... } catch (e) {} // Al menos loggear
+
+// ❌ Operaciones síncronas bloqueantes
+const data = fs.readFileSync() // Usar async
+
+// ❌ Queries en loops
+for (const id of ids) {
+  await prisma.user.findUnique({ where: { id } })
+}
+```
+
+---
+
+## ✅ Checklist Pre-Commit
+
+Antes de cada commit, verificar:
+
+- [ ] ¿Agregué validación de autenticación?
+- [ ] ¿Verifiqué permisos de tenant?
+- [ ] ¿Validé los datos de entrada?
+- [ ] ¿Manejé todos los errores?
+- [ ] ¿Agregué revalidatePath después de mutaciones?
+- [ ] ¿Usé tipos de TypeScript correctamente?
+- [ ] ¿Los componentes tienen nombres descriptivos?
+- [ ] ¿Agregué comentarios para lógica compleja?
+- [ ] ¿Optimicé las queries de Prisma?
+- [ ] ¿Probé la funcionalidad manualmente?
+- [ ] ¿No hay console.logs de debug?
+- [ ] ¿No hay credenciales hardcodeadas?
+- [ ] ¿Los textos están en español?
+- [ ] ¿Actualicé el PLAN.md si completé una tarea?
+
+---
+
+## 🎯 Prioridades de Desarrollo
+
+### Orden de implementación:
+1. **Seguridad primero**: Auth, permisos, validación
+2. **Funcionalidad core**: Features principales
+3. **UX/UI**: Polish, animaciones, feedback
+4. **Performance**: Optimizaciones, caching
+5. **Testing**: Tests automatizados
+6. **Documentación**: Docs, comentarios
+
+### Cuando tengas dudas:
+1. ¿Es seguro? → Si no, arreglarlo primero
+2. ¿Funciona? → Si no, hacerlo funcionar
+3. ¿Es claro? → Si no, refactorizar
+4. ¿Es rápido? → Si no, optimizar
+
+---
+
+## 📚 Recursos y Referencias
+
+### Documentación oficial:
+- Next.js 15: https://nextjs.org/docs
+- Prisma: https://www.prisma.io/docs
+- NextAuth v5: https://authjs.dev
+- shadcn/ui: https://ui.shadcn.com
+- Tailwind CSS: https://tailwindcss.com/docs
+
+### Patrones del proyecto:
+- Ver `/lib/adapters/` para implementar nuevos canales
+- Ver `/app/actions/` para estructura de server actions
+- Ver `/components/channels/` para componentes de UI
+- Ver `/prisma/schema.prisma` para modelo de datos
+
+---
+
+## 🤝 Colaboración
+
+### Al pedir ayuda:
+- Incluir contexto completo
+- Mostrar código relevante
+- Describir comportamiento esperado vs actual
+- Incluir mensajes de error completos
+
+### Al revisar código:
+- Verificar seguridad primero
+- Revisar lógica de negocio
+- Validar tipos de TypeScript
+- Comprobar manejo de errores
+- Verificar performance
+
+---
+
+**Recuerda**: Código que funciona hoy pero es inseguro o difícil de mantener, causará problemas mañana. Siempre prioriza calidad sobre velocidad.
+
+**Mantén estas reglas actualizadas** a medida que el proyecto evoluciona y se descubren nuevos patrones o problemas.
