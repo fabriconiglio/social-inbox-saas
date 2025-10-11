@@ -122,7 +122,7 @@
 
 **Tareas**:
 - [ ] **Meta (Facebook/Instagram)**
-  - [ ] Crear app en Meta for Developers
+  - [ ] Crear app en Meta for Developers (entrar a business facebook para ver la revision)
   - [ ] Configurar productos: Facebook Login, Instagram Basic Display
   - [ ] Obtener App ID y App Secret
   - [ ] Configurar OAuth redirect URIs

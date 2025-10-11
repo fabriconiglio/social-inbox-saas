@@ -6,7 +6,6 @@ import {
   createAdapterError,
   analyzeApiError,
   analyzeMetaError,
-  analyzeHttpError,
   logAdapterError
 } from "@/lib/adapters/error-handler"
 import { ErrorType } from "@/lib/adapters/types"
