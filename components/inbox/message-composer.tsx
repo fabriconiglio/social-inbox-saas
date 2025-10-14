@@ -5,9 +5,10 @@ import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Send, Paperclip, Smile } from "lucide-react"
+import { Send, Paperclip, Smile, Zap } from "lucide-react"
 import { sendMessage } from "@/app/actions/messages"
 import { useRouter } from "next/navigation"
+import { QuickRepliesPopover } from "@/components/inbox/quick-replies-popover"
 
 interface MessageComposerProps {
   threadId: string
@@ -61,6 +62,14 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
           disabled={sending}
         />
         <div className="flex flex-col gap-2">
+          <QuickRepliesPopover
+            tenantId={tenantId}
+            onSelect={(content) => setMessage(content)}
+          >
+            <Button variant="ghost" size="icon" disabled={sending} title="Respuestas rápidas">
+              <Zap className="h-4 w-4" />
+            </Button>
+          </QuickRepliesPopover>
           <Button variant="ghost" size="icon" disabled={sending}>
             <Paperclip className="h-4 w-4" />
           </Button>

@@ -72,12 +72,20 @@ export function InboxSidebar({ tenantId, locals, members, filters }: InboxSideba
           Sin asignar
         </Button>
         <Button
-          variant={filters.status === "open" ? "secondary" : "ghost"}
+          variant={filters.status === "open" || !filters.status ? "secondary" : "ghost"}
           className="w-full justify-start"
           onClick={() => updateFilter("status", "open")}
         >
           <Clock className="mr-2 h-4 w-4" />
           Abiertas
+        </Button>
+        <Button
+          variant={filters.status === "pending" ? "secondary" : "ghost"}
+          className="w-full justify-start"
+          onClick={() => updateFilter("status", "pending")}
+        >
+          <Clock className="mr-2 h-4 w-4" />
+          Pendientes
         </Button>
         <Button
           variant={filters.status === "closed" ? "secondary" : "ghost"}
@@ -144,6 +152,24 @@ export function InboxSidebar({ tenantId, locals, members, filters }: InboxSideba
               <SelectItem value="whatsapp">WhatsApp</SelectItem>
               <SelectItem value="tiktok">TikTok</SelectItem>
               <SelectItem value="mock">Mock</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="status">Estado</Label>
+          <Select
+            value={filters.status || "open"}
+            onValueChange={(v) => updateFilter("status", v === "all" ? null : v)}
+          >
+            <SelectTrigger id="status">
+              <SelectValue placeholder="Todos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="open">Abiertas</SelectItem>
+              <SelectItem value="pending">Pendientes</SelectItem>
+              <SelectItem value="closed">Cerradas</SelectItem>
             </SelectContent>
           </Select>
         </div>

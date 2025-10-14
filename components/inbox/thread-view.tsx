@@ -25,7 +25,12 @@ export function ThreadView({ thread, tenantId, userId, userRole, members }: Thre
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <ThreadHeader thread={thread} onToggleSidebar={() => setShowSidebar(!showSidebar)} />
+      <ThreadHeader 
+        thread={thread} 
+        onToggleSidebar={() => setShowSidebar(!showSidebar)} 
+        tenantId={tenantId}
+        currentUserId={userId}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col">

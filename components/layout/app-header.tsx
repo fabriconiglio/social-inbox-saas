@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { NotificationsDropdown } from "@/components/layout/notifications-dropdown"
 import { logout } from "@/app/actions/auth"
 import { useRouter } from "next/navigation"
 import type { User } from "next-auth"
@@ -32,6 +33,7 @@ export function AppHeader({ user, tenantId }: AppHeaderProps) {
     <header className="flex items-center justify-between border-b px-6 py-3">
       <div />
       <div className="flex items-center space-x-2">
+        <NotificationsDropdown />
         <ThemeToggle />
         <DropdownMenu>
         <DropdownMenuTrigger asChild>

@@ -64,6 +64,15 @@ export default async function InboxPage({ params, searchParams }: InboxPageProps
     tenantId,
   }
 
+  // Por defecto, mostrar solo conversaciones abiertas
+  // Si el usuario selecciona otro filtro de estado, se aplicará ese
+  if (filters.status) {
+    threadFilters.status = filters.status.toUpperCase()
+  } else {
+    // Filtro por defecto: solo abiertas
+    threadFilters.status = "OPEN"
+  }
+
   if (filters.localId) {
     threadFilters.localId = filters.localId
   }
@@ -72,10 +81,6 @@ export default async function InboxPage({ params, searchParams }: InboxPageProps
     threadFilters.channel = {
       type: filters.channel.toUpperCase(),
     }
-  }
-
-  if (filters.status) {
-    threadFilters.status = filters.status.toUpperCase()
   }
 
   if (filters.assignee === "me") {

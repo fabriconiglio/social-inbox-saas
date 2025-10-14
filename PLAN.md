@@ -154,89 +154,89 @@
 ---
 
 #### 2. Respuestas Rápidas (Canned Responses)
-**Estado**: 🔴 No implementado (solo modelo DB)
+**Estado**: ✅ COMPLETADO
 
 **Tareas**:
-- [ ] **UI de Gestión**
-  - [ ] Página `/app/[tenantId]/settings/quick-replies`
-  - [ ] Lista de respuestas rápidas
-  - [ ] Formulario de creación/edición
-  - [ ] Botón de eliminación con confirmación
-  - [ ] Sistema de carpetas/categorías (opcional)
+- [x] **UI de Gestión** ✅ COMPLETADO
+  - [x] Página `/app/[tenantId]/settings/quick-replies`
+  - [x] Lista de respuestas rápidas
+  - [x] Formulario de creación/edición
+  - [x] Botón de eliminación con confirmación
+  - [ ] Sistema de carpetas/categorías (opcional - futuro)
 
-- [ ] **Integración en Composer**
-  - [ ] Botón en `MessageComposer` para abrir selector
-  - [ ] Popover/Dialog con lista de respuestas rápidas
-  - [ ] Búsqueda/filtro de respuestas
-  - [ ] Insertar respuesta en textarea
-  - [ ] Sistema de variables: `{{nombre}}`, `{{local}}`, etc.
-  - [ ] Preview de respuesta con variables reemplazadas
+- [x] **Integración en Composer** ✅ COMPLETADO
+  - [x] Botón en `MessageComposer` para abrir selector
+  - [x] Popover/Dialog con lista de respuestas rápidas
+  - [x] Búsqueda/filtro de respuestas
+  - [x] Insertar respuesta en textarea
+  - [x] Sistema de variables: `{{nombre}}`, `{{local}}`, etc.
+  - [ ] Preview de respuesta con variables reemplazadas (futuro)
 
-- [ ] **Server Actions**
-  - [ ] `createCannedResponse`
-  - [ ] `updateCannedResponse`
-  - [ ] `deleteCannedResponse`
-  - [ ] `listCannedResponses`
+- [x] **Server Actions** ✅ COMPLETADO
+  - [x] `createCannedResponse`
+  - [x] `updateCannedResponse`
+  - [x] `deleteCannedResponse`
+  - [x] `listCannedResponses`
 
-**Estimación**: 2-3 días
+**Estimación**: 2-3 días (Completado en 1 sesión)
 
 ---
 
 #### 3. Asignación de Conversaciones
-**Estado**: 🟡 Modelo implementado, falta UI
+**Estado**: ✅ COMPLETADO
 
 **Tareas**:
-- [ ] **UI de Asignación**
-  - [ ] Dropdown en `ThreadHeader` para asignar agente
-  - [ ] Lista de agentes disponibles del tenant
-  - [ ] Mostrar avatar y nombre del agente asignado
-  - [ ] Botón "Asignarme" para auto-asignarse
-  - [ ] Botón "Desasignar" para liberar thread
+- [x] **UI de Asignación** ✅ COMPLETADO
+  - [x] Dropdown en `ThreadHeader` para asignar agente
+  - [x] Lista de agentes disponibles del tenant
+  - [x] Mostrar avatar y nombre del agente asignado
+  - [x] Botón "Asignarme" para auto-asignarse
+  - [x] Botón "Desasignar" para liberar thread
 
-- [ ] **Filtros por Asignación**
-  - [ ] Filtro "Mis conversaciones" en inbox
-  - [ ] Filtro "Sin asignar"
-  - [ ] Filtro por agente específico
+- [x] **Filtros por Asignación** ✅ COMPLETADO
+  - [x] Filtro "Mis conversaciones" en inbox
+  - [x] Filtro "Sin asignar"
+  - [x] Filtro por agente específico
 
-- [ ] **Server Actions**
-  - [ ] `assignThread(threadId, userId)`
-  - [ ] `unassignThread(threadId)`
-  - [ ] Validar permisos (solo ADMIN+ puede asignar a otros)
+- [x] **Server Actions** ✅ COMPLETADO
+  - [x] `assignThread(threadId, userId)`
+  - [x] `unassignThread(threadId)`
+  - [x] Validar permisos (solo ADMIN+ puede asignar a otros)
 
-- [ ] **Notificaciones**
-  - [ ] Notificar al agente cuando se le asigna un thread
-  - [ ] Mostrar badge con cantidad de threads asignados
+- [x] **Notificaciones** ✅ COMPLETADO
+  - [x] Notificar al agente cuando se le asigna un thread
+  - [x] Mostrar badge con cantidad de threads asignados
 
-**Estimación**: 2 días
+**Estimación**: 2 días (Completado en 1 sesión - Incluye notificaciones)
 
 ---
 
 #### 4. Estados de Conversaciones
-**Estado**: 🟡 Modelo implementado, falta UI completa
+**Estado**: ✅ COMPLETADO
 
 **Tareas**:
-- [ ] **UI de Estados**
-  - [ ] Dropdown en `ThreadHeader` para cambiar estado
-  - [ ] Opciones: Abierto, Pendiente, Cerrado
-  - [ ] Badge visual del estado actual
-  - [ ] Colores distintivos por estado
+- [x] **UI de Estados** ✅ COMPLETADO
+  - [x] Dropdown en `ThreadHeader` para cambiar estado
+  - [x] Opciones: Abierto, Pendiente, Cerrado
+  - [x] Badge visual del estado actual
+  - [x] Colores distintivos por estado
 
-- [ ] **Filtros por Estado**
-  - [ ] Filtro "Abiertas" (por defecto)
-  - [ ] Filtro "Pendientes"
-  - [ ] Filtro "Cerradas"
-  - [ ] Filtro "Todas"
+- [x] **Filtros por Estado** ✅ COMPLETADO
+  - [x] Filtro "Abiertas" (por defecto)
+  - [x] Filtro "Pendientes"
+  - [x] Filtro "Cerradas"
+  - [x] Filtro "Todas"
 
-- [ ] **Lógica de Negocio**
-  - [ ] Reabrir thread cerrado al recibir mensaje nuevo
-  - [ ] Confirmar antes de cerrar thread
-  - [ ] Historial de cambios de estado (AuditLog)
+- [x] **Lógica de Negocio** ✅ COMPLETADO
+  - [x] Reabrir thread cerrado al recibir mensaje nuevo ✅ YA IMPLEMENTADO
+  - [x] Confirmar antes de cerrar thread ✅ COMPLETADO
+  - [x] Historial de cambios de estado (AuditLog) ✅ COMPLETADO
 
-- [ ] **Server Actions**
-  - [ ] `updateThreadStatus(threadId, status)`
-  - [ ] Validar permisos por rol
+- [x] **Server Actions** ✅ COMPLETADO
+  - [x] `updateThreadStatus(threadId, status)`
+  - [x] Validar permisos por rol
 
-**Estimación**: 1-2 días
+**Estimación**: 1-2 días (Completado en 1 sesión - Incluye AuditLog completo)
 
 ---
 
