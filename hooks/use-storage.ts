@@ -3,21 +3,42 @@
 import { useState, useCallback } from 'react'
 import { StorageFile, UploadOptions } from '@/lib/storage/types'
 
+interface UploadProgress {
+  id: string
+  name: string
+  progress: number
+  status: "uploading" | "completed" | "error"
+  error?: string
+}
+
 interface UseStorageReturn {
   uploadFile: (file: File, options?: UploadOptions) => Promise<StorageFile | null>
   deleteFile: (fileId: string) => Promise<boolean>
   getFileUrl: (fileId: string) => Promise<string>
   uploading: boolean
   error: string | null
+  uploadProgress: UploadProgress[]
+  clearProgress: () => void
 }
 
 export function useStorage(): UseStorageReturn {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([])
 
   const uploadFile = useCallback(async (file: File, options?: UploadOptions): Promise<StorageFile | null> => {
+    const fileId = Math.random().toString(36).substr(2, 9)
+    
     setUploading(true)
     setError(null)
+
+    // Agregar archivo al progreso
+    setUploadProgress(prev => [...prev, {
+      id: fileId,
+      name: file.name,
+      progress: 0,
+      status: "uploading"
+    }])
 
     try {
       const formData = new FormData()
@@ -27,10 +48,21 @@ export function useStorage(): UseStorageReturn {
         formData.append('options', JSON.stringify(options))
       }
 
+      // Simular progreso de upload
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => prev.map(p => 
+          p.id === fileId 
+            ? { ...p, progress: Math.min(p.progress + Math.random() * 20, 90) }
+            : p
+        ))
+      }, 200)
+
       const response = await fetch('/api/storage/upload', {
         method: 'POST',
         body: formData,
       })
+
+      clearInterval(progressInterval)
 
       if (!response.ok) {
         throw new Error(`Upload failed: ${response.statusText}`)
@@ -42,10 +74,25 @@ export function useStorage(): UseStorageReturn {
         throw new Error(result.error || 'Upload failed')
       }
 
+      // Marcar como completado
+      setUploadProgress(prev => prev.map(p => 
+        p.id === fileId 
+          ? { ...p, progress: 100, status: "completed" as const }
+          : p
+      ))
+
       return result.file
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Upload failed'
       setError(errorMessage)
+      
+      // Marcar como error
+      setUploadProgress(prev => prev.map(p => 
+        p.id === fileId 
+          ? { ...p, status: "error" as const, error: errorMessage }
+          : p
+      ))
+      
       console.error('[useStorage] Upload error:', err)
       return null
     } finally {
@@ -87,11 +134,17 @@ export function useStorage(): UseStorageReturn {
     }
   }, [])
 
+  const clearProgress = useCallback(() => {
+    setUploadProgress([])
+  }, [])
+
   return {
     uploadFile,
     deleteFile,
     getFileUrl,
     uploading,
     error,
+    uploadProgress,
+    clearProgress,
   }
 }

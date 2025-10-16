@@ -282,7 +282,7 @@
   - [x] Validación de tamaño y tipo de archivo
   - [x] Integración con función de envío
   - [x] Integración con servicio de storage (S3, Cloudinary, etc.)
-  - [ ] Progress bar de upload
+  - [x] Progress bar de upload
 
 - [ ] **Tipos Soportados**
   - [ ] Imágenes (jpg, png, gif)

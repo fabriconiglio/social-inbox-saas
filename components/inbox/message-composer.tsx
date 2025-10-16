@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation"
 import { QuickRepliesPopover } from "@/components/inbox/quick-replies-popover"
 import { toast } from "sonner"
 import { useStorage } from "@/hooks/use-storage"
+import { UploadProgress } from "@/components/ui/progress-bar"
 
 interface Attachment {
   id: string
@@ -38,7 +39,7 @@ interface MessageComposerProps {
 export function MessageComposer({ threadId, channelId, tenantId, userId }: MessageComposerProps) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { uploadFile, uploading: storageUploading, error: storageError } = useStorage()
+  const { uploadFile, uploading: storageUploading, error: storageError, uploadProgress, clearProgress } = useStorage()
   
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
@@ -215,6 +216,24 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
         className="hidden"
       />
       
+      {/* Progress bar de upload */}
+      {uploadProgress.length > 0 && (
+        <div className="mb-3 p-3 bg-muted rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Subiendo archivos...</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearProgress}
+              className="h-6 px-2 text-xs"
+            >
+              Limpiar
+            </Button>
+          </div>
+          <UploadProgress files={uploadProgress} />
+        </div>
+      )}
+
       {/* Preview de adjuntos */}
       {attachments.length > 0 && (
         <div className="mb-3 p-3 bg-muted rounded-lg">

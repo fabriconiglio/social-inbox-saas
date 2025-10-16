@@ -1,0 +1,96 @@
+/* Progress Bar Animations */
+
+@keyframes progress-stripes {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 1rem 0;
+  }
+}
+
+.bg-stripes {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 1rem 1rem;
+}
+
+.progress-stripes {
+  animation: progress-stripes 1s linear infinite;
+}
+
+/* Smooth progress transitions */
+.progress-bar {
+  transition: width 0.3s ease-in-out;
+}
+
+/* Upload progress specific styles */
+.upload-progress-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.upload-progress-item {
+  transition: all 0.3s ease-in-out;
+}
+
+.upload-progress-item.completed {
+  opacity: 0.7;
+}
+
+.upload-progress-item.error {
+  opacity: 0.8;
+}
+
+/* Circular progress animation */
+.circular-progress {
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Pulse animation for loading states */
+.pulse-progress {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Shake animation for errors */
+.shake-progress {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
