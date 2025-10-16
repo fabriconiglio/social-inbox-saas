@@ -244,16 +244,16 @@
 **Estado**: 🔴 Modelo implementado, falta UI
 
 **Tareas**:
-- [ ] **Página de Contactos**
-  - [ ] Lista de contactos con búsqueda
-  - [ ] Tarjeta de contacto con información básica
-  - [ ] Click para ver detalle completo
+- [x] **Página de Contactos** ✅ COMPLETADO
+  - [x] Lista de contactos con búsqueda
+  - [x] Tarjeta de contacto con información básica
+  - [x] Click para ver detalle completo
 
-- [ ] **Detalle de Contacto**
-  - [ ] Modal/Página con información completa
-  - [ ] Nombre, handle, plataforma, teléfono, email
-  - [ ] Campo de notas editable
-  - [ ] Historial de conversaciones con el contacto
+- [x] **Detalle de Contacto** ✅ COMPLETADO
+  - [x] Modal/Página con información completa
+  - [x] Nombre, handle, plataforma, teléfono, email
+  - [x] Campo de notas editable
+  - [x] Historial de conversaciones con el contacto ✅ COMPLETADO
   - [ ] Botón para iniciar nueva conversación
 
 - [ ] **Enriquecimiento de Datos**
