@@ -273,14 +273,15 @@
 ### 🟡 PRIORIDAD MEDIA (Importantes pero no bloqueantes)
 
 #### 6. Adjuntos y Multimedia
-**Estado**: 🔴 Estructura preparada, no implementado
+**Estado**: 🟡 Funcionalidad básica implementada
 
 **Tareas**:
-- [ ] **Upload de Archivos**
-  - [ ] Botón de adjuntar en `MessageComposer`
-  - [ ] Integración con servicio de storage (S3, Cloudinary, etc.)
-  - [ ] Preview de archivos antes de enviar
-  - [ ] Validación de tamaño y tipo de archivo
+- [x] **Upload de Archivos** ✅ COMPLETADO
+  - [x] Botón de adjuntar en `MessageComposer`
+  - [x] Preview de archivos antes de enviar
+  - [x] Validación de tamaño y tipo de archivo
+  - [x] Integración con función de envío
+  - [x] Integración con servicio de storage (S3, Cloudinary, etc.)
   - [ ] Progress bar de upload
 
 - [ ] **Tipos Soportados**

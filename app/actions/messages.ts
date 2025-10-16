@@ -11,8 +11,9 @@ export async function sendMessage(formData: FormData) {
     const threadId = formData.get("threadId") as string
     const channelId = formData.get("channelId") as string
     const body = formData.get("body") as string
+    const attachmentsData = formData.get("attachments") as string
 
-    if (!threadId || !channelId || !body) {
+    if (!threadId || !channelId || (!body && !attachmentsData)) {
       return { error: "Missing required fields" }
     }
 
@@ -30,6 +31,28 @@ export async function sendMessage(formData: FormData) {
       return { error: "Unauthorized" }
     }
 
+    // Procesar adjuntos
+    let attachments = null
+    if (attachmentsData) {
+      try {
+        const parsedAttachments = JSON.parse(attachmentsData)
+        // Ahora guardamos la información completa del storage
+        attachments = parsedAttachments.map((att: any) => ({
+          name: att.name,
+          size: att.size,
+          type: att.type,
+          url: att.storageFile?.url,
+          storageId: att.storageFile?.id,
+          publicId: att.storageFile?.publicId,
+          key: att.storageFile?.key,
+          uploadedAt: new Date()
+        }))
+      } catch (error) {
+        console.error("Error parsing attachments:", error)
+        return { error: "Invalid attachments data" }
+      }
+    }
+
     // Create message in database
     const message = await prisma.message.create({
       data: {
@@ -37,7 +60,8 @@ export async function sendMessage(formData: FormData) {
         channelId,
         direction: "OUTBOUND",
         authorId: user.id,
-        body,
+        body: body || "",
+        attachments,
         sentAt: new Date(),
       },
     })
@@ -48,7 +72,8 @@ export async function sendMessage(formData: FormData) {
       messageId: message.id,
       message: {
         threadExternalId: thread.externalId,
-        body,
+        body: body || "",
+        attachments: attachments,
       },
     })
 
