@@ -16,9 +16,13 @@ import { UploadProgress } from "@/components/ui/progress-bar"
 import { ImagePreview, ImageGallery } from "@/components/ui/image-preview"
 import { VideoPreview, VideoGallery } from "@/components/ui/video-preview"
 import { DocumentPreview, DocumentGallery } from "@/components/ui/document-preview"
+import { AudioPreview, AudioGallery } from "@/components/ui/audio-preview"
+import { ImageGalleryTrigger } from "@/components/inbox/image-gallery-modal"
+import { VideoPlayerTrigger } from "@/components/inbox/video-player-modal"
 import { useImageOptimization, useImageDetection } from "@/hooks/use-image-optimization"
 import { useVideoOptimization, useVideoDetection } from "@/hooks/use-video-optimization"
 import { useDocumentOptimization, useDocumentDetection } from "@/hooks/use-document-optimization"
+import { useAudioOptimization, useAudioDetection } from "@/hooks/use-audio-optimization"
 
 interface Attachment {
   id: string
@@ -52,6 +56,8 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
   const { isVideoFile, isSupportedVideoType } = useVideoDetection()
   const { optimizeDocument, isOptimizing: documentOptimizing } = useDocumentOptimization()
   const { isDocumentFile, isSupportedDocumentType } = useDocumentDetection()
+  const { optimizeAudio, isOptimizing: audioOptimizing } = useAudioOptimization()
+  const { isAudioFile, isSupportedAudioType } = useAudioDetection()
   
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
@@ -128,6 +134,21 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
             compression: 'medium',
             removeMetadata: true,
             optimizeImages: true
+          })
+          
+          if (optimized) {
+            finalFile = optimized.file
+            optimizedUrl = optimized.url
+            toast.success(`${file.name} optimizado (${Math.round(optimized.compressionRatio)}% reducción)`)
+          }
+        } else if (isAudioFile(file) && isSupportedAudioType(file)) {
+          const optimized = await optimizeAudio(file, {
+            quality: 0.8,
+            bitrate: 128, // 128 kbps
+            sampleRate: 44100,
+            channels: 2,
+            format: 'mp3',
+            removeMetadata: true
           })
           
           if (optimized) {
@@ -301,7 +322,8 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
             const images = attachments.filter(att => isImageFile(att.file))
             const videos = attachments.filter(att => isVideoFile(att.file))
             const documents = attachments.filter(att => isDocumentFile(att.file))
-            const otherFiles = attachments.filter(att => !isImageFile(att.file) && !isVideoFile(att.file) && !isDocumentFile(att.file))
+            const audios = attachments.filter(att => isAudioFile(att.file))
+            const otherFiles = attachments.filter(att => !isImageFile(att.file) && !isVideoFile(att.file) && !isDocumentFile(att.file) && !isAudioFile(att.file))
             
             return (
               <div className="space-y-3">
@@ -309,16 +331,34 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
                 {images.length > 0 && (
                   <div>
                     <h4 className="text-sm font-medium mb-2">Imágenes ({images.length})</h4>
-                    <ImageGallery
+                    <ImageGalleryTrigger
                       images={images.map(img => ({
                         id: img.id,
                         src: img.url || '',
                         name: img.name,
                         size: img.size,
-                        type: img.type
+                        type: img.type,
+                        thumbnail: img.url
                       }))}
-                      onRemove={removeAttachment}
-                      maxImages={4}
+                      onDownload={(imageId) => {
+                        const image = images.find(img => img.id === imageId)
+                        if (image) {
+                          const link = document.createElement('a')
+                          link.href = image.url || ''
+                          link.download = image.name
+                          link.click()
+                        }
+                      }}
+                      onShare={(imageId) => {
+                        const image = images.find(img => img.id === imageId)
+                        if (image && navigator.share) {
+                          navigator.share({
+                            title: image.name,
+                            url: image.url || ''
+                          })
+                        }
+                      }}
+                      className="grid grid-cols-2 md:grid-cols-4 gap-2"
                     />
                   </div>
                 )}
@@ -327,16 +367,34 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
                 {videos.length > 0 && (
                   <div>
                     <h4 className="text-sm font-medium mb-2">Videos ({videos.length})</h4>
-                    <VideoGallery
+                    <VideoPlayerTrigger
                       videos={videos.map(vid => ({
                         id: vid.id,
                         src: vid.url || '',
                         name: vid.name,
                         size: vid.size,
-                        type: vid.type
+                        type: vid.type,
+                        poster: vid.url // Usar la URL como poster por ahora
                       }))}
-                      onRemove={removeAttachment}
-                      maxVideos={4}
+                      onDownload={(videoId) => {
+                        const video = videos.find(vid => vid.id === videoId)
+                        if (video) {
+                          const link = document.createElement('a')
+                          link.href = video.url || ''
+                          link.download = video.name
+                          link.click()
+                        }
+                      }}
+                      onShare={(videoId) => {
+                        const video = videos.find(vid => vid.id === videoId)
+                        if (video && navigator.share) {
+                          navigator.share({
+                            title: video.name,
+                            url: video.url || ''
+                          })
+                        }
+                      }}
+                      className="grid grid-cols-2 md:grid-cols-4 gap-2"
                     />
                   </div>
                 )}
@@ -355,6 +413,24 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
                       }))}
                       onRemove={removeAttachment}
                       maxDocuments={6}
+                    />
+                  </div>
+                )}
+
+                {/* Galería de audio */}
+                {audios.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Audio ({audios.length})</h4>
+                    <AudioGallery
+                      audios={audios.map(audio => ({
+                        id: audio.id,
+                        src: audio.url || '',
+                        name: audio.name,
+                        size: audio.size,
+                        type: audio.type
+                      }))}
+                      onRemove={removeAttachment}
+                      maxAudios={4}
                     />
                   </div>
                 )}
@@ -422,10 +498,10 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
           </Button>
           <Button 
             onClick={handleSend} 
-            disabled={(!message.trim() && attachments.length === 0) || sending || uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing}
-            title={uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing ? "Procesando..." : "Enviar mensaje"}
+            disabled={(!message.trim() && attachments.length === 0) || sending || uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing || audioOptimizing}
+            title={uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing || audioOptimizing ? "Procesando..." : "Enviar mensaje"}
           >
-            {uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing ? (
+            {uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing || audioOptimizing ? (
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
             ) : (
               <Send className="h-4 w-4" />

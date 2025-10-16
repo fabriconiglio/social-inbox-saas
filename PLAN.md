@@ -288,11 +288,11 @@
   - [x] Imágenes (jpg, png, gif)
   - [x] Videos (mp4, mov)
   - [x] Documentos (pdf, doc, xlsx)
-  - [ ] Audio (mp3, wav, ogg)
+  - [x] Audio (mp3, wav, ogg)
 
 - [ ] **Visualización**
-  - [ ] Gallery viewer para imágenes
-  - [ ] Video player integrado
+  - [x] Gallery viewer para imágenes
+  - [x] Video player integrado
   - [ ] PDF viewer
   - [ ] Botón de descarga
 
