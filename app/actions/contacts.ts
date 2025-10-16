@@ -319,6 +319,489 @@ export async function updateContact(tenantId: string, data: z.infer<typeof updat
   }
 }
 
+// Versión simplificada para actualizar contacto (solo requiere contactId y data)
+export async function updateContactSimple(contactId: string, data: {
+  name?: string
+  handle?: string
+  platform?: "instagram" | "facebook" | "whatsapp" | "tiktok"
+  phone?: string
+  email?: string
+  notes?: string
+}) {
+  try {
+    const user = await requireAuth()
+    
+    // Primero obtener el contacto para verificar permisos
+    const existingContact = await prisma.contact.findUnique({
+      where: { id: contactId },
+      select: { tenantId: true }
+    })
+
+    if (!existingContact) {
+      return { error: "Contacto no encontrado" }
+    }
+
+    // Verificar acceso al tenant
+    const membership = await prisma.membership.findFirst({
+      where: {
+        userId: user.id!,
+        tenantId: existingContact.tenantId,
+      },
+    })
+
+    if (!membership) {
+      return { error: "No tienes acceso a este tenant" }
+    }
+
+    // Solo ADMIN y OWNER pueden actualizar contactos
+    if (membership.role !== "ADMIN" && membership.role !== "OWNER") {
+      return { error: "No tienes permisos para actualizar contactos" }
+    }
+
+    // Validar datos básicos
+    if (data.name && data.name.trim().length === 0) {
+      return { error: "El nombre no puede estar vacío" }
+    }
+
+    if (data.handle && data.handle.trim().length === 0) {
+      return { error: "El handle no puede estar vacío" }
+    }
+
+    if (data.email && data.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+      return { error: "El email no es válido" }
+    }
+
+    // Si se está cambiando platform o handle, verificar que no exista otro contacto
+    if (data.platform || data.handle) {
+      const platform = data.platform || (await prisma.contact.findUnique({ where: { id: contactId } }))?.platform
+      const handle = data.handle || (await prisma.contact.findUnique({ where: { id: contactId } }))?.handle
+
+      if (platform && handle) {
+        const duplicateContact = await prisma.contact.findFirst({
+          where: {
+            tenantId: existingContact.tenantId,
+            platform,
+            handle,
+            id: { not: contactId },
+          },
+        })
+
+        if (duplicateContact) {
+          return { error: "Ya existe un contacto con este handle en esta plataforma" }
+        }
+      }
+    }
+
+    // Actualizar el contacto
+    const contact = await prisma.contact.update({
+      where: { id: contactId },
+      data: {
+        ...(data.name && { name: data.name.trim() }),
+        ...(data.handle && { handle: data.handle.trim() }),
+        ...(data.platform && { platform: data.platform }),
+        ...(data.phone !== undefined && { phone: data.phone.trim() || null }),
+        ...(data.email !== undefined && { email: data.email.trim() || null }),
+        ...(data.notes !== undefined && { notes: data.notes.trim() || null }),
+      },
+    })
+
+    // Revalidar cache
+    revalidatePath(`/app/${existingContact.tenantId}/contacts`)
+    revalidatePath(`/app/${existingContact.tenantId}/contacts/${contactId}`)
+    
+    return { success: true, data: contact }
+  } catch (error) {
+    console.error("[Update Contact Simple] Error:", error)
+    return { error: "Error al actualizar el contacto" }
+  }
+}
+
+// Alias para compatibilidad - función principal para actualizar contactos
+export const updateContactById = updateContactSimple
+
+// Obtener threads de un contacto específico
+export async function getContactThreads(contactId: string) {
+  try {
+    const user = await requireAuth()
+    
+    // Primero obtener el contacto para verificar permisos
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId },
+      select: { 
+        id: true,
+        tenantId: true,
+        name: true,
+        handle: true,
+        platform: true
+      }
+    })
+
+    if (!contact) {
+      return { error: "Contacto no encontrado" }
+    }
+
+    // Verificar acceso al tenant
+    const membership = await prisma.membership.findFirst({
+      where: {
+        userId: user.id!,
+        tenantId: contact.tenantId,
+      },
+    })
+
+    if (!membership) {
+      return { error: "No tienes acceso a este tenant" }
+    }
+
+    // Obtener threads del contacto con información completa
+    const threads = await prisma.thread.findMany({
+      where: {
+        contactId: contactId,
+        tenantId: contact.tenantId,
+      },
+      include: {
+        channel: {
+          select: {
+            id: true,
+            displayName: true,
+            type: true,
+            status: true,
+          },
+        },
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+          },
+        },
+        messages: {
+          select: {
+            id: true,
+            direction: true,
+            body: true,
+            sentAt: true,
+            deliveredAt: true,
+            authorId: true,
+          },
+          orderBy: {
+            sentAt: 'desc',
+          },
+          take: 1, // Solo el último mensaje para preview
+        },
+        _count: {
+          select: {
+            messages: true,
+          },
+        },
+      },
+      orderBy: {
+        lastMessageAt: 'desc',
+      },
+    })
+
+    // Formatear respuesta con información del contacto
+    const result = {
+      contact: {
+        id: contact.id,
+        name: contact.name,
+        handle: contact.handle,
+        platform: contact.platform,
+      },
+      threads: threads.map(thread => ({
+        id: thread.id,
+        externalId: thread.externalId,
+        subject: thread.subject,
+        status: thread.status,
+        assigneeId: thread.assigneeId,
+        assignee: thread.assignee,
+        channel: thread.channel,
+        lastMessageAt: thread.lastMessageAt,
+        createdAt: thread.createdAt,
+        updatedAt: thread.updatedAt,
+        lastMessage: thread.messages[0] || null,
+        messageCount: thread._count.messages,
+      })),
+      totalThreads: threads.length,
+      openThreads: threads.filter(t => t.status === "OPEN").length,
+      pendingThreads: threads.filter(t => t.status === "PENDING").length,
+      closedThreads: threads.filter(t => t.status === "CLOSED").length,
+    }
+
+    return { success: true, data: result }
+  } catch (error) {
+    console.error("[Get Contact Threads] Error:", error)
+    return { error: "Error al obtener threads del contacto" }
+  }
+}
+
+// Búsqueda avanzada de contactos
+export async function searchContacts(query: {
+  tenantId: string
+  search?: string
+  platform?: string
+  hasThreads?: boolean
+  threadStatus?: "OPEN" | "PENDING" | "CLOSED"
+  assignedTo?: string
+  hasEmail?: boolean
+  hasPhone?: boolean
+  createdAfter?: Date
+  createdBefore?: Date
+  lastActivityAfter?: Date
+  lastActivityBefore?: Date
+  limit?: number
+  offset?: number
+  sortBy?: "name" | "handle" | "createdAt" | "lastActivity"
+  sortOrder?: "asc" | "desc"
+}) {
+  try {
+    const user = await requireAuth()
+    
+    // Verificar acceso al tenant
+    const membership = await prisma.membership.findFirst({
+      where: {
+        userId: user.id!,
+        tenantId: query.tenantId,
+      },
+    })
+
+    if (!membership) {
+      return { error: "No tienes acceso a este tenant" }
+    }
+
+    const {
+      search,
+      platform,
+      hasThreads,
+      threadStatus,
+      assignedTo,
+      hasEmail,
+      hasPhone,
+      createdAfter,
+      createdBefore,
+      lastActivityAfter,
+      lastActivityBefore,
+      limit = 50,
+      offset = 0,
+      sortBy = "lastActivity",
+      sortOrder = "desc"
+    } = query
+
+    // Construir filtros base
+    const where: any = { tenantId: query.tenantId }
+
+    // Búsqueda de texto
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { handle: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { phone: { contains: search, mode: "insensitive" } },
+        { notes: { contains: search, mode: "insensitive" } },
+      ]
+    }
+
+    // Filtro por plataforma
+    if (platform) {
+      where.platform = platform
+    }
+
+    // Filtro por email
+    if (hasEmail !== undefined) {
+      if (hasEmail) {
+        where.email = { not: null }
+      } else {
+        where.email = null
+      }
+    }
+
+    // Filtro por teléfono
+    if (hasPhone !== undefined) {
+      if (hasPhone) {
+        where.phone = { not: null }
+      } else {
+        where.phone = null
+      }
+    }
+
+    // Filtros de fecha
+    if (createdAfter || createdBefore) {
+      where.createdAt = {}
+      if (createdAfter) where.createdAt.gte = createdAfter
+      if (createdBefore) where.createdAt.lte = createdBefore
+    }
+
+    // Filtros relacionados con threads
+    if (hasThreads !== undefined || threadStatus || assignedTo || lastActivityAfter || lastActivityBefore) {
+      where.threads = {}
+      
+      if (hasThreads !== undefined) {
+        if (hasThreads) {
+          where.threads.some = {}
+        } else {
+          where.threads.none = {}
+        }
+      }
+
+      if (threadStatus) {
+        if (hasThreads === false) {
+          // Si no queremos threads, no aplicamos filtro de status
+        } else {
+          where.threads.some = { ...where.threads.some, status: threadStatus }
+        }
+      }
+
+      if (assignedTo) {
+        if (hasThreads === false) {
+          // Si no queremos threads, no aplicamos filtro de asignado
+        } else {
+          where.threads.some = { ...where.threads.some, assigneeId: assignedTo }
+        }
+      }
+
+      if (lastActivityAfter || lastActivityBefore) {
+        if (hasThreads === false) {
+          // Si no queremos threads, no aplicamos filtro de actividad
+        } else {
+          where.threads.some = { 
+            ...where.threads.some, 
+            lastMessageAt: {
+              ...(lastActivityAfter && { gte: lastActivityAfter }),
+              ...(lastActivityBefore && { lte: lastActivityBefore })
+            }
+          }
+        }
+      }
+    }
+
+    // Construir ordenamiento
+    let orderBy: any = {}
+    switch (sortBy) {
+      case "name":
+        orderBy = { name: sortOrder }
+        break
+      case "handle":
+        orderBy = { handle: sortOrder }
+        break
+      case "createdAt":
+        orderBy = { createdAt: sortOrder }
+        break
+      case "lastActivity":
+        orderBy = { 
+          threads: {
+            _count: "desc"
+          }
+        }
+        break
+      default:
+        orderBy = { createdAt: "desc" }
+    }
+
+    // Ejecutar búsqueda
+    const [contacts, total] = await Promise.all([
+      prisma.contact.findMany({
+        where,
+        include: {
+          threads: {
+            select: {
+              id: true,
+              status: true,
+              lastMessageAt: true,
+              assigneeId: true,
+              assignee: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+              channel: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  type: true,
+                },
+              },
+            },
+            orderBy: {
+              lastMessageAt: "desc",
+            },
+          },
+          _count: {
+            select: {
+              threads: true,
+            },
+          },
+        },
+        orderBy,
+        take: limit,
+        skip: offset,
+      }),
+      prisma.contact.count({ where }),
+    ])
+
+    // Procesar resultados
+    const processedContacts = contacts.map(contact => {
+      const openThreads = contact.threads.filter(t => t.status === "OPEN").length
+      const pendingThreads = contact.threads.filter(t => t.status === "PENDING").length
+      const closedThreads = contact.threads.filter(t => t.status === "CLOSED").length
+      
+      const lastActivity = contact.threads.length > 0 
+        ? contact.threads[0].lastMessageAt 
+        : contact.createdAt
+
+      return {
+        id: contact.id,
+        name: contact.name,
+        handle: contact.handle,
+        platform: contact.platform,
+        phone: contact.phone,
+        email: contact.email,
+        notes: contact.notes,
+        createdAt: contact.createdAt,
+        updatedAt: contact.updatedAt,
+        lastActivity,
+        threads: contact.threads,
+        stats: {
+          totalThreads: contact._count.threads,
+          openThreads,
+          pendingThreads,
+          closedThreads,
+        },
+      }
+    })
+
+    // Estadísticas de la búsqueda
+    const stats = {
+      total: total,
+      returned: processedContacts.length,
+      hasMore: offset + processedContacts.length < total,
+      platforms: await prisma.contact.groupBy({
+        by: ["platform"],
+        where: { tenantId: query.tenantId },
+        _count: { platform: true },
+      }),
+    }
+
+    return { 
+      success: true, 
+      data: {
+        contacts: processedContacts,
+        stats,
+        pagination: {
+          limit,
+          offset,
+          total,
+          hasMore: stats.hasMore,
+        },
+      }
+    }
+  } catch (error) {
+    console.error("[Search Contacts] Error:", error)
+    return { error: "Error al buscar contactos" }
+  }
+}
+
 // Eliminar contacto
 export async function deleteContact(contactId: string, tenantId: string) {
   try {

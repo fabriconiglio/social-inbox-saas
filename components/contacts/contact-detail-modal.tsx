@@ -29,7 +29,10 @@ import {
   X
 } from "lucide-react"
 import { ContactConversationHistory } from "./contact-conversation-history"
+import { CreateThreadDialog } from "./create-thread-dialog"
+import { EditContactForm } from "./edit-contact-form"
 import { getContact, updateContact } from "@/app/actions/contacts"
+import { listTenantAgents } from "@/app/actions/thread-assignment"
 import { toast } from "sonner"
 import { formatDistanceToNow, format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -119,11 +122,16 @@ export function ContactDetailModal({
   const [editingNotes, setEditingNotes] = useState(false)
   const [notes, setNotes] = useState("")
   const [savingNotes, setSavingNotes] = useState(false)
+  const [showCreateThread, setShowCreateThread] = useState(false)
+  const [channels, setChannels] = useState<any[]>([])
+  const [agents, setAgents] = useState<any[]>([])
+  const [editingContact, setEditingContact] = useState(false)
 
   // Cargar contacto cuando cambie el ID
   useEffect(() => {
     if (contactId && open) {
       loadContact()
+      loadChannelsAndAgents()
     }
   }, [contactId, open])
 
@@ -148,6 +156,34 @@ export function ContactDetailModal({
       onOpenChange(false)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadChannelsAndAgents = async () => {
+    try {
+      // Cargar canales del tenant
+      const { prisma } = await import("@/lib/prisma")
+      const channelsData = await prisma.channel.findMany({
+        where: {
+          local: {
+            tenantId: tenantId,
+          },
+        },
+        select: {
+          id: true,
+          displayName: true,
+          type: true,
+          status: true,
+        },
+      })
+
+      // Cargar agentes del tenant
+      const agentsResult = await listTenantAgents(tenantId)
+      
+      setChannels(channelsData)
+      setAgents(agentsResult.data || [])
+    } catch (error) {
+      console.error("Error loading channels and agents:", error)
     }
   }
 
@@ -177,7 +213,7 @@ export function ContactDetailModal({
     }
   }
 
-  const handleCancelEdit = () => {
+  const handleCancelEditNotes = () => {
     setNotes(contact?.notes || "")
     setEditingNotes(false)
   }
@@ -185,6 +221,36 @@ export function ContactDetailModal({
   const handleViewThread = (threadId: string) => {
     // Abrir thread en nueva pestaña o navegar
     window.open(`/app/${tenantId}/inbox?thread=${threadId}`, '_blank')
+  }
+
+  const handleThreadCreated = () => {
+    // Recargar el contacto para mostrar la nueva conversación
+    loadContact()
+    if (onContactUpdated) {
+      onContactUpdated()
+    }
+  }
+
+  const handleContactSaved = (updatedContact: any) => {
+    // Actualizar solo los campos que pueden cambiar
+    setContact(prev => prev ? {
+      ...prev,
+      name: updatedContact.name,
+      handle: updatedContact.handle,
+      platform: updatedContact.platform,
+      phone: updatedContact.phone,
+      email: updatedContact.email,
+      notes: updatedContact.notes,
+      updatedAt: updatedContact.updatedAt || new Date(),
+    } : null)
+    setEditingContact(false)
+    if (onContactUpdated) {
+      onContactUpdated()
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingContact(false)
   }
 
   const getInitials = (name?: string | null, handle?: string) => {
@@ -304,6 +370,17 @@ export function ContactDetailModal({
               </Card>
             </div>
 
+            {/* Botón para nueva conversación */}
+            <div className="flex justify-center">
+              <Button 
+                onClick={() => setShowCreateThread(true)}
+                className="flex items-center gap-2"
+              >
+                <MessageSquare className="h-4 w-4" />
+                Iniciar Nueva Conversación
+              </Button>
+            </div>
+
             {/* Tabs con información detallada */}
             <Tabs defaultValue="info" className="space-y-4">
               <TabsList>
@@ -316,49 +393,71 @@ export function ContactDetailModal({
                   {/* Información de contacto */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <User className="h-5 w-5" />
-                        Información de Contacto
+                      <CardTitle className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <User className="h-5 w-5" />
+                          Información de Contacto
+                        </div>
+                        {!editingContact && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setEditingContact(true)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {contact.phone && (
-                        <div className="flex items-center gap-3">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm font-medium">Teléfono</p>
-                            <p className="text-sm text-muted-foreground">{contact.phone}</p>
+                      {editingContact ? (
+                        <EditContactForm
+                          contact={contact}
+                          tenantId={tenantId}
+                          onSave={handleContactSaved}
+                          onCancel={handleCancelEdit}
+                        />
+                      ) : (
+                        <>
+                          {contact.phone && (
+                            <div className="flex items-center gap-3">
+                              <Phone className="h-4 w-4 text-muted-foreground" />
+                              <div>
+                                <p className="text-sm font-medium">Teléfono</p>
+                                <p className="text-sm text-muted-foreground">{contact.phone}</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {contact.email && (
+                            <div className="flex items-center gap-3">
+                              <Mail className="h-4 w-4 text-muted-foreground" />
+                              <div>
+                                <p className="text-sm font-medium">Email</p>
+                                <p className="text-sm text-muted-foreground">{contact.email}</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center gap-3">
+                            <Hash className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <p className="text-sm font-medium">Handle</p>
+                              <p className="text-sm text-muted-foreground">@{contact.handle}</p>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      
-                      {contact.email && (
-                        <div className="flex items-center gap-3">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm font-medium">Email</p>
-                            <p className="text-sm text-muted-foreground">{contact.email}</p>
+                          
+                          <div className="flex items-center gap-3">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <p className="text-sm font-medium">Creado</p>
+                              <p className="text-sm text-muted-foreground">
+                                {format(contact.createdAt, "PPP", { locale: es })}
+                              </p>
+                            </div>
                           </div>
-                        </div>
+                        </>
                       )}
-                      
-                      <div className="flex items-center gap-3">
-                        <Hash className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium">Handle</p>
-                          <p className="text-sm text-muted-foreground">@{contact.handle}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-3">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium">Creado</p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(contact.createdAt, "PPP", { locale: es })}
-                          </p>
-                        </div>
-                      </div>
                     </CardContent>
                   </Card>
 
@@ -403,7 +502,7 @@ export function ContactDetailModal({
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={handleCancelEdit}
+                              onClick={handleCancelEditNotes}
                               disabled={savingNotes}
                             >
                               <X className="h-4 w-4 mr-2" />
@@ -439,6 +538,18 @@ export function ContactDetailModal({
           </div>
         ) : null}
       </DialogContent>
+
+      {/* Diálogo para crear nueva conversación */}
+      <CreateThreadDialog
+        open={showCreateThread}
+        onOpenChange={setShowCreateThread}
+        contactId={contactId || ""}
+        contactName={contact?.name || contact?.handle || "Contacto"}
+        tenantId={tenantId}
+        channels={channels}
+        agents={agents}
+        onThreadCreated={handleThreadCreated}
+      />
     </Dialog>
   )
 }

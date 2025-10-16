@@ -254,17 +254,17 @@
   - [x] Nombre, handle, plataforma, teléfono, email
   - [x] Campo de notas editable
   - [x] Historial de conversaciones con el contacto ✅ COMPLETADO
-  - [ ] Botón para iniciar nueva conversación
+  - [x] Botón para iniciar nueva conversación
 
-- [ ] **Enriquecimiento de Datos**
-  - [ ] Formulario para agregar/editar información
-  - [ ] Validación de datos
-  - [ ] Auto-guardar notas
+- [x] **Enriquecimiento de Datos** ✅ COMPLETADO
+  - [x] Formulario para agregar/editar información
+  - [x] Validación de datos
+  - [x] Auto-guardar notas
 
-- [ ] **Server Actions**
-  - [ ] `updateContact(contactId, data)`
-  - [ ] `getContactThreads(contactId)`
-  - [ ] `searchContacts(query)`
+- [x] **Server Actions** ✅ COMPLETADO
+  - [x] `updateContact(contactId, data)`
+  - [x] `getContactThreads(contactId)`
+  - [x] `searchContacts(query)`
 
 **Estimación**: 2-3 días
 
