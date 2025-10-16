@@ -13,6 +13,12 @@ import { QuickRepliesPopover } from "@/components/inbox/quick-replies-popover"
 import { toast } from "sonner"
 import { useStorage } from "@/hooks/use-storage"
 import { UploadProgress } from "@/components/ui/progress-bar"
+import { ImagePreview, ImageGallery } from "@/components/ui/image-preview"
+import { VideoPreview, VideoGallery } from "@/components/ui/video-preview"
+import { DocumentPreview, DocumentGallery } from "@/components/ui/document-preview"
+import { useImageOptimization, useImageDetection } from "@/hooks/use-image-optimization"
+import { useVideoOptimization, useVideoDetection } from "@/hooks/use-video-optimization"
+import { useDocumentOptimization, useDocumentDetection } from "@/hooks/use-document-optimization"
 
 interface Attachment {
   id: string
@@ -40,6 +46,12 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { uploadFile, uploading: storageUploading, error: storageError, uploadProgress, clearProgress } = useStorage()
+  const { optimizeImage, isOptimizing: imageOptimizing } = useImageOptimization()
+  const { isImageFile, isSupportedImageType } = useImageDetection()
+  const { optimizeVideo, isOptimizing: videoOptimizing } = useVideoOptimization()
+  const { isVideoFile, isSupportedVideoType } = useVideoDetection()
+  const { optimizeDocument, isOptimizing: documentOptimizing } = useDocumentOptimization()
+  const { isDocumentFile, isSupportedDocumentType } = useDocumentDetection()
   
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
@@ -78,8 +90,55 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
           continue
         }
 
+        // Optimizar archivo según su tipo
+        let finalFile = file
+        let optimizedUrl = URL.createObjectURL(file)
+        
+        if (isImageFile(file) && isSupportedImageType(file)) {
+          const optimized = await optimizeImage(file, {
+            maxWidth: 1920,
+            maxHeight: 1080,
+            quality: 0.8,
+            format: 'jpeg'
+          })
+          
+          if (optimized) {
+            finalFile = optimized.file
+            optimizedUrl = optimized.url
+            toast.success(`${file.name} optimizado (${Math.round(optimized.compressionRatio)}% reducción)`)
+          }
+        } else if (isVideoFile(file) && isSupportedVideoType(file)) {
+          const optimized = await optimizeVideo(file, {
+            maxWidth: 1920,
+            maxHeight: 1080,
+            quality: 0.8,
+            bitrate: 2000000, // 2 Mbps
+            fps: 30,
+            format: 'mp4'
+          })
+          
+          if (optimized) {
+            finalFile = optimized.file
+            optimizedUrl = optimized.url
+            toast.success(`${file.name} optimizado (${Math.round(optimized.compressionRatio)}% reducción)`)
+          }
+        } else if (isDocumentFile(file) && isSupportedDocumentType(file)) {
+          const optimized = await optimizeDocument(file, {
+            quality: 0.8,
+            compression: 'medium',
+            removeMetadata: true,
+            optimizeImages: true
+          })
+          
+          if (optimized) {
+            finalFile = optimized.file
+            optimizedUrl = optimized.url
+            toast.success(`${file.name} optimizado (${Math.round(optimized.compressionRatio)}% reducción)`)
+          }
+        }
+
         // Subir archivo al storage
-        const storageFile = await uploadFile(file, {
+        const storageFile = await uploadFile(finalFile, {
           folder: `messagehub/${tenantId}`,
           public: true
         })
@@ -91,11 +150,11 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
 
         const attachment: Attachment = {
           id: Math.random().toString(36).substr(2, 9),
-          file,
+          file: finalFile,
           name: file.name,
-          size: file.size,
-          type: file.type,
-          url: URL.createObjectURL(file),
+          size: finalFile.size,
+          type: finalFile.type,
+          url: optimizedUrl,
           storageFile: {
             id: storageFile.id,
             url: storageFile.url,
@@ -237,25 +296,97 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
       {/* Preview de adjuntos */}
       {attachments.length > 0 && (
         <div className="mb-3 p-3 bg-muted rounded-lg">
-          <div className="flex flex-wrap gap-2">
-            {attachments.map((attachment) => (
-              <div key={attachment.id} className="flex items-center gap-2 bg-background rounded-md p-2 border">
-                {getFileIcon(attachment.type)}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{attachment.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeAttachment(attachment.id)}
-                  className="h-6 w-6 p-0"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
+          {/* Separar por tipo de archivo */}
+          {(() => {
+            const images = attachments.filter(att => isImageFile(att.file))
+            const videos = attachments.filter(att => isVideoFile(att.file))
+            const documents = attachments.filter(att => isDocumentFile(att.file))
+            const otherFiles = attachments.filter(att => !isImageFile(att.file) && !isVideoFile(att.file) && !isDocumentFile(att.file))
+            
+            return (
+              <div className="space-y-3">
+                {/* Galería de imágenes */}
+                {images.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Imágenes ({images.length})</h4>
+                    <ImageGallery
+                      images={images.map(img => ({
+                        id: img.id,
+                        src: img.url || '',
+                        name: img.name,
+                        size: img.size,
+                        type: img.type
+                      }))}
+                      onRemove={removeAttachment}
+                      maxImages={4}
+                    />
+                  </div>
+                )}
+
+                {/* Galería de videos */}
+                {videos.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Videos ({videos.length})</h4>
+                    <VideoGallery
+                      videos={videos.map(vid => ({
+                        id: vid.id,
+                        src: vid.url || '',
+                        name: vid.name,
+                        size: vid.size,
+                        type: vid.type
+                      }))}
+                      onRemove={removeAttachment}
+                      maxVideos={4}
+                    />
+                  </div>
+                )}
+
+                {/* Galería de documentos */}
+                {documents.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Documentos ({documents.length})</h4>
+                    <DocumentGallery
+                      documents={documents.map(doc => ({
+                        id: doc.id,
+                        src: doc.url || '',
+                        name: doc.name,
+                        size: doc.size,
+                        type: doc.type
+                      }))}
+                      onRemove={removeAttachment}
+                      maxDocuments={6}
+                    />
+                  </div>
+                )}
+                
+                {/* Otros archivos */}
+                {otherFiles.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Archivos ({otherFiles.length})</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {otherFiles.map((attachment) => (
+                        <div key={attachment.id} className="flex items-center gap-2 bg-background rounded-md p-2 border">
+                          {getFileIcon(attachment.type)}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{attachment.name}</p>
+                            <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeAttachment(attachment.id)}
+                            className="h-6 w-6 p-0"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            )
+          })()}
         </div>
       )}
 
@@ -291,10 +422,10 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
           </Button>
           <Button 
             onClick={handleSend} 
-            disabled={(!message.trim() && attachments.length === 0) || sending || uploading || storageUploading}
-            title={uploading || storageUploading ? "Procesando..." : "Enviar mensaje"}
+            disabled={(!message.trim() && attachments.length === 0) || sending || uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing}
+            title={uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing ? "Procesando..." : "Enviar mensaje"}
           >
-            {uploading || storageUploading ? (
+            {uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing ? (
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
             ) : (
               <Send className="h-4 w-4" />

@@ -284,10 +284,10 @@
   - [x] Integración con servicio de storage (S3, Cloudinary, etc.)
   - [x] Progress bar de upload
 
-- [ ] **Tipos Soportados**
-  - [ ] Imágenes (jpg, png, gif)
-  - [ ] Videos (mp4, mov)
-  - [ ] Documentos (pdf, doc, xlsx)
+- [x] **Tipos Soportados** ✅ COMPLETADO
+  - [x] Imágenes (jpg, png, gif)
+  - [x] Videos (mp4, mov)
+  - [x] Documentos (pdf, doc, xlsx)
   - [ ] Audio (mp3, wav, ogg)
 
 - [ ] **Visualización**
