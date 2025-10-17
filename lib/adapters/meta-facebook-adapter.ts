@@ -15,9 +15,18 @@ import {
   logAdapterError 
 } from "./error-handler"
 import { verifyMetaWebhook } from "@/lib/webhook-verification"
+import { MediaMappingService } from "@/lib/media-mapping"
+import { ChannelCredentialsService } from "@/lib/channel-credentials"
 
 export class MetaFacebookAdapter implements ChannelAdapter {
   type = "facebook"
+
+  /**
+   * Obtener credenciales del canal desde la base de datos
+   */
+  private async getChannelCredentials(channelId: string): Promise<Record<string, any> | null> {
+    return await ChannelCredentialsService.getMetaCredentials(channelId)
+  }
 
   async subscribeWebhooks(channelId: string, webhookUrl: string): Promise<AdapterResult<void>> {
     try {
@@ -47,18 +56,36 @@ export class MetaFacebookAdapter implements ChannelAdapter {
 
       if (message.attachments) {
         for (const att of message.attachments) {
-          attachments.push({
+          const attachment: Attachment = {
             type: att.type || "file",
             url: att.payload?.url || "",
             mimeType: att.payload?.mime_type,
-          })
+          }
+          attachments.push(attachment)
+        }
+      }
+
+      // Mapear URLs de media si hay adjuntos
+      let mappedAttachments: Attachment[] | undefined
+      if (attachments.length > 0) {
+        const credentials = await this.getChannelCredentials(channelId)
+        
+        if (credentials) {
+          mappedAttachments = await MediaMappingService.mapAttachments(
+            attachments,
+            'facebook',
+            credentials
+          )
+        } else {
+          console.warn("[Facebook] No se pudieron obtener credenciales para mapear URLs de media")
+          mappedAttachments = attachments
         }
       }
 
       return {
         externalId: message.mid,
         body: message.text || "",
-        attachments: attachments.length > 0 ? attachments : undefined,
+        attachments: mappedAttachments,
         sentAt: new Date(messaging.timestamp),
         senderHandle: messaging.sender.id,
         threadExternalId: messaging.sender.id,
@@ -99,6 +126,70 @@ export class MetaFacebookAdapter implements ChannelAdapter {
         return { success: false, error }
       }
 
+      // Preparar el mensaje
+      let messagePayload: any = {
+        recipient: { id: message.threadExternalId },
+        access_token: accessToken,
+      }
+
+      // Si hay adjuntos, enviar el primer adjunto como mensaje principal
+      if (message.attachments && message.attachments.length > 0) {
+        const attachment = message.attachments[0]
+        
+        // Facebook Messenger API soporta diferentes tipos de adjuntos
+        if (attachment.type === "image") {
+          messagePayload.message = {
+            attachment: {
+              type: "image",
+              payload: {
+                url: attachment.url,
+              },
+            },
+          }
+          if (message.body) {
+            messagePayload.message.text = message.body
+          }
+        } else if (attachment.type === "video") {
+          messagePayload.message = {
+            attachment: {
+              type: "video",
+              payload: {
+                url: attachment.url,
+              },
+            },
+          }
+          if (message.body) {
+            messagePayload.message.text = message.body
+          }
+        } else if (attachment.type === "audio") {
+          messagePayload.message = {
+            attachment: {
+              type: "audio",
+              payload: {
+                url: attachment.url,
+              },
+            },
+          }
+        } else if (attachment.type === "file") {
+          messagePayload.message = {
+            attachment: {
+              type: "file",
+              payload: {
+                url: attachment.url,
+              },
+            },
+          }
+          if (message.body) {
+            messagePayload.message.text = message.body
+          }
+        }
+      } else {
+        // Mensaje de texto simple
+        messagePayload.message = {
+          text: message.body,
+        }
+      }
+
       // Enviar mensaje usando Facebook Messenger API
       const response = await fetch(
         `https://graph.facebook.com/v18.0/${pageId}/messages`,
@@ -107,13 +198,7 @@ export class MetaFacebookAdapter implements ChannelAdapter {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            recipient: { id: message.threadExternalId },
-            message: {
-              text: message.body,
-            },
-            access_token: accessToken,
-          }),
+          body: JSON.stringify(messagePayload),
         }
       )
 

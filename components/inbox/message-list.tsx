@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import useSWR from "swr"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import { cn } from "@/lib/utils"
+import { PdfAttachmentSimple, PdfViewerSimple } from "./pdf-viewer-simple"
 
 interface MessageListProps {
   threadId: string
@@ -20,10 +21,22 @@ export function MessageList({ threadId, tenantId }: MessageListProps) {
   })
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [pdfModalOpen, setPdfModalOpen] = useState(false)
+  const [selectedPdf, setSelectedPdf] = useState<{ url: string; fileName: string } | null>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
+
+  const handleOpenPdfModal = (url: string, fileName: string) => {
+    setSelectedPdf({ url, fileName })
+    setPdfModalOpen(true)
+  }
+
+  const handleClosePdfModal = () => {
+    setPdfModalOpen(false)
+    setSelectedPdf(null)
+  }
 
   if (error) {
     return <div className="flex flex-1 items-center justify-center text-destructive">Error al cargar los mensajes</div>
@@ -55,18 +68,30 @@ export function MessageList({ threadId, tenantId }: MessageListProps) {
 
                 {message.attachments && message.attachments.length > 0 && (
                   <div className="mt-2 space-y-2">
-                    {message.attachments.map((att: any, idx: number) => (
-                      <div key={idx}>
-                        {att.type === "image" && (
-                          <img src={att.url || "/placeholder.svg"} alt="Attachment" className="max-h-64 rounded" />
-                        )}
-                        {att.type === "file" && (
-                          <a href={att.url} target="_blank" rel="noopener noreferrer" className="underline">
-                            {att.filename || "Archivo adjunto"}
-                          </a>
-                        )}
-                      </div>
-                    ))}
+                    {message.attachments.map((att: any, idx: number) => {
+                      const isPdf = att.filename?.toLowerCase().endsWith('.pdf') || att.type === 'pdf'
+                      const fileName = att.filename || "Archivo adjunto"
+                      
+                      return (
+                        <div key={idx}>
+                          {att.type === "image" && (
+                            <img src={att.url || "/placeholder.svg"} alt="Attachment" className="max-h-64 rounded" />
+                          )}
+                          {isPdf && (
+                            <PdfAttachmentSimple
+                              url={att.url}
+                              fileName={fileName}
+                              onOpenModal={() => handleOpenPdfModal(att.url, fileName)}
+                            />
+                          )}
+                          {att.type === "file" && !isPdf && (
+                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="underline">
+                              {fileName}
+                            </a>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -80,6 +105,16 @@ export function MessageList({ threadId, tenantId }: MessageListProps) {
         )
       })}
       <div ref={messagesEndRef} />
+      
+      {/* Modal del PDF Viewer */}
+      {selectedPdf && (
+        <PdfViewerSimple
+          isOpen={pdfModalOpen}
+          onClose={handleClosePdfModal}
+          pdfUrl={selectedPdf.url}
+          fileName={selectedPdf.fileName}
+        />
+      )}
     </div>
   )
 }

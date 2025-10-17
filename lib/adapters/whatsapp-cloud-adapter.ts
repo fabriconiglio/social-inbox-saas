@@ -15,9 +15,18 @@ import {
   logAdapterError 
 } from "./error-handler"
 import { verifyMetaWebhook } from "@/lib/webhook-verification"
+import { MediaMappingService } from "@/lib/media-mapping"
+import { ChannelCredentialsService } from "@/lib/channel-credentials"
 
 export class WhatsAppCloudAdapter implements ChannelAdapter {
   type = "whatsapp"
+
+  /**
+   * Obtener credenciales del canal desde la base de datos
+   */
+  private async getChannelCredentials(channelId: string): Promise<Record<string, any> | null> {
+    return await ChannelCredentialsService.getWhatsAppCredentials(channelId)
+  }
 
   async subscribeWebhooks(channelId: string, webhookUrl: string): Promise<AdapterResult<void>> {
     try {
@@ -50,33 +59,55 @@ export class WhatsAppCloudAdapter implements ChannelAdapter {
       if (message.type === "text") {
         body = message.text?.body || ""
       } else if (message.type === "image") {
-        attachments.push({
+        const attachment: Attachment = {
           type: "image",
           url: message.image?.id || "",
           mimeType: message.image?.mime_type,
-        })
+        }
+        attachments.push(attachment)
         body = message.image?.caption || ""
       } else if (message.type === "video") {
-        attachments.push({
+        const attachment: Attachment = {
           type: "video",
           url: message.video?.id || "",
           mimeType: message.video?.mime_type,
-        })
+        }
+        attachments.push(attachment)
         body = message.video?.caption || ""
       } else if (message.type === "document") {
-        attachments.push({
+        const attachment: Attachment = {
           type: "file",
           url: message.document?.id || "",
           mimeType: message.document?.mime_type,
           filename: message.document?.filename,
-        })
+        }
+        attachments.push(attachment)
         body = message.document?.caption || ""
+      }
+
+      // Mapear URLs de media si hay adjuntos
+      let mappedAttachments: Attachment[] | undefined
+      if (attachments.length > 0) {
+        // Obtener credenciales del canal para mapear URLs
+        // En un escenario real, esto vendría de la base de datos
+        const credentials = await this.getChannelCredentials(channelId)
+        
+        if (credentials) {
+          mappedAttachments = await MediaMappingService.mapAttachments(
+            attachments,
+            'whatsapp',
+            credentials
+          )
+        } else {
+          console.warn("[WhatsApp] No se pudieron obtener credenciales para mapear URLs de media")
+          mappedAttachments = attachments
+        }
       }
 
       return {
         externalId: message.id,
         body,
-        attachments: attachments.length > 0 ? attachments : undefined,
+        attachments: mappedAttachments,
         sentAt: new Date(Number.parseInt(message.timestamp) * 1000),
         senderHandle: message.from,
         threadExternalId: message.from,
@@ -117,6 +148,58 @@ export class WhatsAppCloudAdapter implements ChannelAdapter {
         return { success: false, error }
       }
 
+      // Preparar el payload del mensaje
+      let messagePayload: any = {
+        messaging_product: "whatsapp",
+        to: message.threadExternalId,
+      }
+
+      // Si hay adjuntos, enviar el primer adjunto como mensaje principal
+      if (message.attachments && message.attachments.length > 0) {
+        const attachment = message.attachments[0]
+        
+        // Determinar el tipo de mensaje basado en el adjunto
+        if (attachment.type === "image") {
+          messagePayload.type = "image"
+          messagePayload.image = {
+            link: attachment.url,
+          }
+          if (message.body) {
+            messagePayload.image.caption = message.body
+          }
+        } else if (attachment.type === "video") {
+          messagePayload.type = "video"
+          messagePayload.video = {
+            link: attachment.url,
+          }
+          if (message.body) {
+            messagePayload.video.caption = message.body
+          }
+        } else if (attachment.type === "audio") {
+          messagePayload.type = "audio"
+          messagePayload.audio = {
+            link: attachment.url,
+          }
+        } else if (attachment.type === "file") {
+          messagePayload.type = "document"
+          messagePayload.document = {
+            link: attachment.url,
+          }
+          if (attachment.filename) {
+            messagePayload.document.filename = attachment.filename
+          }
+          if (message.body) {
+            messagePayload.document.caption = message.body
+          }
+        }
+      } else {
+        // Mensaje de texto simple
+        messagePayload.type = "text"
+        messagePayload.text = {
+          body: message.body,
+        }
+      }
+
       // Enviar mensaje usando WhatsApp Cloud API
       const response = await fetch(
         `https://graph.facebook.com/v18.0/${phoneId}/messages`,
@@ -126,14 +209,7 @@ export class WhatsAppCloudAdapter implements ChannelAdapter {
             "Content-Type": "application/json",
             Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify({
-            messaging_product: "whatsapp",
-            to: message.threadExternalId,
-            type: "text",
-            text: {
-              body: message.body,
-            },
-          }),
+          body: JSON.stringify(messagePayload),
         }
       )
 

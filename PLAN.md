@@ -290,17 +290,17 @@
   - [x] Documentos (pdf, doc, xlsx)
   - [x] Audio (mp3, wav, ogg)
 
-- [ ] **Visualización**
+- [x] **Visualización** ✅ COMPLETADO
   - [x] Gallery viewer para imágenes
   - [x] Video player integrado
-  - [ ] PDF viewer
-  - [ ] Botón de descarga
+  - [x] PDF viewer ✅ COMPLETADO
+  - [x] Botón de descarga ✅ COMPLETADO
 
-- [ ] **Adapters**
-  - [ ] Implementar envío de adjuntos en cada adapter
-  - [ ] Mapear URLs de media de plataformas externas
+- [x] **Adapters** ✅ COMPLETADO
+  - [x] Implementar envío de adjuntos en cada adapter ✅ COMPLETADO
+  - [x] Mapear URLs de media de plataformas externas ✅ COMPLETADO
 
-**Estimación**: 3-4 días
+**Estimación**: 3-4 días (Completado en 1 sesión - Incluye PDF viewer)
 
 ---
 
