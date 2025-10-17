@@ -19,9 +19,36 @@ interface ThreadListProps {
   selectedThreadId: string | null
   onSelectThread: (threadId: string) => void
   tenantId: string
+  searchQuery?: string
 }
 
-export function ThreadList({ threads, selectedThreadId, onSelectThread }: ThreadListProps) {
+export function ThreadList({ 
+  threads, 
+  selectedThreadId, 
+  onSelectThread, 
+  tenantId, 
+  searchQuery
+}: ThreadListProps) {
+  // Filtrar threads localmente si hay query de búsqueda
+  const filteredThreads = searchQuery && searchQuery.length >= 2 
+    ? threads.filter(thread => {
+        const query = searchQuery.toLowerCase()
+        
+        // Buscar en nombre del contacto
+        if (thread.contact?.name?.toLowerCase().includes(query)) return true
+        
+        // Buscar en handle del contacto
+        if (thread.contact?.handle?.toLowerCase().includes(query)) return true
+        
+        // Buscar en mensajes
+        if (thread.messages.some(msg => msg.body.toLowerCase().includes(query))) return true
+        
+        // Buscar en external ID
+        if (thread.externalId.toLowerCase().includes(query)) return true
+        
+        return false
+      })
+    : threads
   function getChannelIcon(type: string) {
     switch (type.toLowerCase()) {
       case "instagram":
@@ -53,16 +80,32 @@ export function ThreadList({ threads, selectedThreadId, onSelectThread }: Thread
   return (
     <div className="flex w-96 flex-col border-r">
       <div className="border-b p-4">
-        <h3 className="font-semibold">Conversaciones ({threads.length})</h3>
+        <h3 className="font-semibold">
+          {searchQuery ? "Resultados de búsqueda" : "Conversaciones"} 
+          ({filteredThreads.length})
+        </h3>
+        {searchQuery && (
+          <p className="text-sm text-muted-foreground mt-1">
+            Buscando: "{searchQuery}"
+          </p>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto">
-        {threads.length === 0 ? (
+        {filteredThreads.length === 0 ? (
           <div className="flex h-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
-            No hay conversaciones que coincidan con los filtros
+            {searchQuery ? (
+              <>
+                No se encontraron resultados para "{searchQuery}"
+                <br />
+                <span className="text-xs">Intenta con otros términos de búsqueda</span>
+              </>
+            ) : (
+              "No hay conversaciones que coincidan con los filtros"
+            )}
           </div>
         ) : (
-          threads.map((thread) => {
+          filteredThreads.map((thread) => {
             const lastMessage = thread.messages[0]
             const isSelected = thread.id === selectedThreadId
 

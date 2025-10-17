@@ -305,26 +305,26 @@
 ---
 
 #### 7. Búsqueda Avanzada
-**Estado**: 🔴 No implementado
+**Estado**: ✅ COMPLETADO
 
 **Tareas**:
 - [ ] **UI de Búsqueda**
-  - [ ] Barra de búsqueda en inbox
+  - [x] Barra de búsqueda en inbox
   - [ ] Filtros avanzados (canal, fecha, estado, agente)
   - [ ] Búsqueda en tiempo real con debounce
   - [ ] Destacar resultados de búsqueda
 
-- [ ] **Búsqueda Backend**
-  - [ ] Full-text search en PostgreSQL
-  - [ ] Índice de búsqueda en mensajes
-  - [ ] Búsqueda por nombre de contacto
-  - [ ] Búsqueda por handle/teléfono
+- [x] **Búsqueda Backend**
+  - [x] Full-text search en PostgreSQL
+  - [x] Índice de búsqueda en mensajes
+  - [x] Búsqueda por nombre de contacto
+  - [x] Búsqueda por handle/teléfono
 
-- [ ] **Server Actions**
-  - [ ] `searchThreads(query, filters)`
-  - [ ] `searchMessages(query, filters)`
+- [x] **Server Actions**
+  - [x] `searchThreads(query, filters)`
+  - [x] `searchMessages(query, filters)`
 
-**Estimación**: 2-3 días
+**Estimación**: 2-3 días (Completado en 1 sesión - Búsqueda completa con filtros y highlighting)
 
 ---
 

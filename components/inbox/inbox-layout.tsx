@@ -44,6 +44,7 @@ export function InboxLayout({ tenantId, userId, userRole, locals, members, threa
         selectedThreadId={selectedThreadId}
         onSelectThread={setSelectedThreadId}
         tenantId={tenantId}
+        searchQuery={filters.q}
       />
 
       {/* Thread view */}

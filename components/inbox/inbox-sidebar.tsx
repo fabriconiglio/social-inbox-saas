@@ -105,11 +105,12 @@ export function InboxSidebar({ tenantId, locals, members, filters }: InboxSideba
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               id="search"
-              placeholder="Buscar..."
+              placeholder="Buscar conversaciones..."
               className="pl-8"
               defaultValue={filters.q}
               onChange={(e) => {
                 const value = e.target.value
+                // Debounce simple
                 setTimeout(() => updateFilter("q", value || null), 500)
               }}
             />
