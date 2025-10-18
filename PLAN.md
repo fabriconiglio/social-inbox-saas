@@ -333,8 +333,8 @@
 
 **Tareas**:
 - [ ] **Notificaciones In-App**
-  - [ ] Bell icon en header con badge de contador
-  - [ ] Dropdown con lista de notificaciones
+  - ✅ Bell icon en header con badge de contador
+  - ✅ Dropdown con lista de notificaciones
   - [ ] Marcar como leído
   - [ ] Click para ir al thread
 
