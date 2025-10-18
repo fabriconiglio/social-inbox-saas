@@ -310,9 +310,9 @@
 **Tareas**:
 - [ ] **UI de Búsqueda**
   - [x] Barra de búsqueda en inbox
-  - [ ] Filtros avanzados (canal, fecha, estado, agente)
-  - [ ] Búsqueda en tiempo real con debounce
-  - [ ] Destacar resultados de búsqueda
+  - ✅ Filtros avanzados (canal, fecha, estado, agente)
+  - ✅ Búsqueda en tiempo real con debounce
+  - ✅ Destacar resultados de búsqueda
 
 - [x] **Búsqueda Backend**
   - [x] Full-text search en PostgreSQL

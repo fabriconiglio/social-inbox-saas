@@ -19,16 +19,10 @@ interface InboxLayoutProps {
     contact: Contact | null
     messages: Message[]
   })[]
-  filters: {
-    localId?: string
-    channel?: string
-    status?: string
-    assignee?: string
-    q?: string
-  }
+  userMembership?: Membership
 }
 
-export function InboxLayout({ tenantId, userId, userRole, locals, members, threads, filters }: InboxLayoutProps) {
+export function InboxLayout({ tenantId, userId, userRole, locals, members, threads, userMembership }: InboxLayoutProps) {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(threads[0]?.id || null)
 
   const selectedThread = threads.find((t) => t.id === selectedThreadId)
@@ -36,7 +30,7 @@ export function InboxLayout({ tenantId, userId, userRole, locals, members, threa
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Sidebar with filters */}
-      <InboxSidebar tenantId={tenantId} locals={locals} members={members} filters={filters} />
+      <InboxSidebar tenantId={tenantId} locals={locals} members={members} />
 
       {/* Thread list */}
       <ThreadList
@@ -44,7 +38,8 @@ export function InboxLayout({ tenantId, userId, userRole, locals, members, threa
         selectedThreadId={selectedThreadId}
         onSelectThread={setSelectedThreadId}
         tenantId={tenantId}
-        searchQuery={filters.q}
+        userId={userId}
+        userMembership={userMembership}
       />
 
       {/* Thread view */}

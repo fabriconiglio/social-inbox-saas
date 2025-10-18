@@ -7,6 +7,8 @@ import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { PdfAttachmentSimple, PdfViewerSimple } from "./pdf-viewer-simple"
+import { TextHighlight } from "@/components/ui/text-highlight"
+import { useAdvancedFilters } from "@/hooks/use-advanced-filters"
 
 interface MessageListProps {
   threadId: string
@@ -19,6 +21,8 @@ export function MessageList({ threadId, tenantId }: MessageListProps) {
   const { data: messages, error } = useSWR(`/api/tenants/${tenantId}/threads/${threadId}/messages`, fetcher, {
     refreshInterval: 3000, // Poll every 3 seconds for new messages
   })
+
+  const { filters } = useAdvancedFilters(tenantId)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [pdfModalOpen, setPdfModalOpen] = useState(false)
@@ -64,7 +68,13 @@ export function MessageList({ threadId, tenantId }: MessageListProps) {
 
             <div className={cn("flex max-w-[70%] flex-col gap-1", isOutbound && "items-end")}>
               <div className={cn("rounded-lg p-3", isOutbound ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                <p className="text-sm">{message.body}</p>
+                <p className="text-sm">
+                  <TextHighlight
+                    text={message.body}
+                    searchTerm={filters.q || ""}
+                    highlightClassName={isOutbound ? "bg-yellow-300 dark:bg-yellow-600" : "bg-yellow-200 dark:bg-yellow-800"}
+                  />
+                </p>
 
                 {message.attachments && message.attachments.length > 0 && (
                   <div className="mt-2 space-y-2">

@@ -4,40 +4,26 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Inbox, User, Users, Clock, CheckCircle2, Search } from "lucide-react"
+import { Inbox, User, Users, Clock, CheckCircle2, Search, Calendar, Loader2 } from "lucide-react"
 import type { Channel, Local, Membership, User as UserType } from "@prisma/client"
+import { useAdvancedFilters } from "@/hooks/use-advanced-filters"
 
 interface InboxSidebarProps {
   tenantId: string
   locals: (Local & { channels: Channel[] })[]
   members: (Membership & { user: UserType })[]
-  filters: {
-    localId?: string
-    channel?: string
-    status?: string
-    assignee?: string
-    q?: string
-  }
 }
 
-export function InboxSidebar({ tenantId, locals, members, filters }: InboxSidebarProps) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-
-  function updateFilter(key: string, value: string | null) {
-    const params = new URLSearchParams(searchParams.toString())
-    if (value) {
-      params.set(key, value)
-    } else {
-      params.delete(key)
-    }
-    router.push(`/app/${tenantId}/inbox?${params.toString()}`)
-  }
-
-  function clearFilters() {
-    router.push(`/app/${tenantId}/inbox`)
-  }
+export function InboxSidebar({ tenantId, locals, members }: InboxSidebarProps) {
+  const { 
+    filters, 
+    searchQuery, 
+    setSearchQuery, 
+    isSearching,
+    activeFiltersCount, 
+    updateFilter, 
+    clearFilters 
+  } = useAdvancedFilters(tenantId)
 
   return (
     <div className="flex w-64 flex-col border-r bg-muted/30">
@@ -106,15 +92,18 @@ export function InboxSidebar({ tenantId, locals, members, filters }: InboxSideba
             <Input
               id="search"
               placeholder="Buscar conversaciones..."
-              className="pl-8"
-              defaultValue={filters.q}
-              onChange={(e) => {
-                const value = e.target.value
-                // Debounce simple
-                setTimeout(() => updateFilter("q", value || null), 500)
-              }}
+              className="pl-8 pr-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              disabled={isSearching}
             />
+            {isSearching && (
+              <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+            )}
           </div>
+          {isSearching && (
+            <p className="text-xs text-muted-foreground">Buscando...</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -197,9 +186,30 @@ export function InboxSidebar({ tenantId, locals, members, filters }: InboxSideba
           </Select>
         </div>
 
-        {(filters.localId || filters.channel || filters.assignee || filters.status || filters.q) && (
+        <div className="space-y-2">
+          <Label htmlFor="dateRange">Rango de fechas</Label>
+          <Select
+            value={filters.dateRange || "all"}
+            onValueChange={(v) => updateFilter("dateRange", v === "all" ? null : v)}
+          >
+            <SelectTrigger id="dateRange">
+              <SelectValue placeholder="Todos los tiempos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los tiempos</SelectItem>
+              <SelectItem value="today">Hoy</SelectItem>
+              <SelectItem value="yesterday">Ayer</SelectItem>
+              <SelectItem value="thisWeek">Esta semana</SelectItem>
+              <SelectItem value="lastWeek">Semana pasada</SelectItem>
+              <SelectItem value="thisMonth">Este mes</SelectItem>
+              <SelectItem value="lastMonth">Mes pasado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {(filters.localId || filters.channel || filters.assignee || filters.status || filters.dateRange || filters.q) && (
           <Button variant="outline" className="w-full bg-transparent" onClick={clearFilters}>
-            Limpiar filtros
+            Limpiar filtros ({activeFiltersCount})
           </Button>
         )}
       </div>
