@@ -396,9 +396,9 @@
 **Estado**: 🟡 Modelo y cálculo implementados, falta UI completa
 
 **Tareas**:
-- [ ] **UI de Configuración**
-  - [ ] Formulario para editar SLA existente
-  - [ ] Configurar tiempo de primera respuesta
+- [x] **UI de Configuración** ✅ COMPLETADO
+  - [x] Formulario para editar SLA existente ✅ COMPLETADO
+  - [x] Configurar tiempo de primera respuesta ✅ COMPLETADO
   - [ ] Configurar horarios de atención por día
   - [ ] Toggle para horarios 24/7
   - [ ] Preview de cómo afecta el SLA
