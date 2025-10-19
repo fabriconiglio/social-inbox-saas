@@ -49,8 +49,9 @@ export function NotificationsDropdown() {
 
   async function loadNotifications() {
     try {
-      // TODO: Obtener userId real del contexto de autenticación
-      const result = await listNotifications("", 10)
+      // Usar userId del mock para desarrollo
+      const { mockUser } = await import("@/lib/mock-data")
+      const result = await listNotifications(mockUser.id, 10)
       if (result.success && result.data) {
         setNotifications(result.data)
       }
@@ -63,8 +64,9 @@ export function NotificationsDropdown() {
 
   async function loadUnreadCount() {
     try {
-      // TODO: Obtener userId real del contexto de autenticación
-      const result = await getUnreadCount("")
+      // Usar userId del mock para desarrollo
+      const { mockUser } = await import("@/lib/mock-data")
+      const result = await getUnreadCount(mockUser.id)
       if (result.success) {
         setUnreadCount(result.count || 0)
       }
@@ -124,7 +126,8 @@ export function NotificationsDropdown() {
     }
 
     // Navegar según el tipo de notificación
-    const tenantId = window.location.pathname.split("/")[2]
+    const pathParts = window.location.pathname.split("/")
+    const tenantId = pathParts[2] || "tenant-1" // Fallback al tenant mock
     
     switch (notification.type) {
       case "thread_assigned":

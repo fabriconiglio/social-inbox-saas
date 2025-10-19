@@ -3,6 +3,7 @@ import { env } from "@/lib/env"
 import { prisma } from "@/lib/prisma"
 import { getAdapter } from "@/lib/adapters"
 import type { SendMessageDTO } from "@/lib/adapters"
+import { monitorSLAs } from "@/lib/sla-monitor"
 
 const connection = {
   host: new URL(env.REDIS_URL).hostname,
@@ -10,6 +11,7 @@ const connection = {
 }
 
 export const messageQueue = new Queue("messages", { connection })
+export const slaQueue = new Queue("sla-monitor", { connection })
 
 interface SendMessageJob {
   channelId: string
@@ -95,3 +97,46 @@ messageWorker.on("completed", (job) => {
 messageWorker.on("failed", (job, err) => {
   console.error(`[Queue] Job ${job?.id} failed:`, err)
 })
+
+// Worker para monitoreo de SLA
+export const slaWorker = new Worker(
+  "sla-monitor",
+  async (job) => {
+    try {
+      console.log("[SLA Worker] Iniciando monitoreo de SLA...")
+      await monitorSLAs()
+      console.log("[SLA Worker] Monitoreo de SLA completado")
+    } catch (error) {
+      console.error("[SLA Worker] Error:", error)
+      throw error
+    }
+  },
+  {
+    connection,
+    concurrency: 1,
+  },
+)
+
+slaWorker.on("completed", (job) => {
+  console.log(`[SLA Worker] Job ${job.id} completed`)
+})
+
+slaWorker.on("failed", (job, err) => {
+  console.error(`[SLA Worker] Job ${job?.id} failed:`, err)
+})
+
+// Función para programar monitoreo de SLA
+export async function scheduleSLAMonitoring() {
+  // Programar monitoreo cada 5 minutos
+  await slaQueue.add(
+    "monitor-sla",
+    {},
+    {
+      repeat: { pattern: "*/5 * * * *" }, // Cada 5 minutos
+      removeOnComplete: 10,
+      removeOnFail: 5,
+    }
+  )
+  
+  console.log("[SLA Queue] Monitoreo de SLA programado cada 5 minutos")
+}

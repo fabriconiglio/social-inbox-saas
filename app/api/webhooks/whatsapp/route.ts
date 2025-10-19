@@ -138,6 +138,23 @@ export async function POST(request: NextRequest) {
           },
         })
 
+        // Crear notificación si el thread está asignado a alguien
+        if (thread.assigneeId) {
+          await prisma.notification.create({
+            data: {
+              userId: thread.assigneeId,
+              type: "new_message",
+              payloadJSON: {
+                threadId: thread.id,
+                contactName: contact.name || contact.handle,
+                messagePreview: messageDTO.body.substring(0, 100) + (messageDTO.body.length > 100 ? "..." : ""),
+                threadChannel: channel.displayName,
+                threadContact: contact.name || contact.handle,
+              },
+            },
+          })
+        }
+
         console.log(`[WhatsApp] Message ingested for thread ${thread.id}`)
       }
     }

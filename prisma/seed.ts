@@ -539,6 +539,55 @@ async function main() {
 
   console.log("✓ SLA created")
 
+  // Create sample notifications
+  console.log("Creating sample notifications...")
+  await prisma.notification.createMany({
+    data: [
+      {
+        userId: agent.id,
+        type: "new_message",
+        payloadJSON: {
+          threadId: thread1.id,
+          contactName: "María González",
+          messagePreview: "Hola! Quería consultar por los precios de sus productos",
+          threadChannel: "Instagram",
+        },
+      },
+      {
+        userId: agent.id,
+        type: "thread_assigned",
+        payloadJSON: {
+          threadId: thread1.id,
+          assignedBy: "Admin Demo",
+          threadContact: "María González",
+          threadChannel: "Instagram",
+        },
+      },
+      {
+        userId: admin.id,
+        type: "sla_warning",
+        payloadJSON: {
+          threadId: thread1.id,
+          threadContact: "María González",
+          timeRemaining: "15 minutos",
+        },
+      },
+      {
+        userId: agent.id,
+        type: "new_message",
+        payloadJSON: {
+          threadId: thread2.id,
+          contactName: "Juan Pérez",
+          messagePreview: "¿Cuál es su horario de atención?",
+          threadChannel: "Facebook",
+        },
+        readAt: new Date(), // Esta está marcada como leída
+      },
+    ],
+  })
+
+  console.log("✓ Sample notifications created")
+
   console.log("✅ Seed completed successfully!")
   console.log("\n📝 Demo credentials:")
   console.log("Admin: admin@demo.com / admin123")

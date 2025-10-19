@@ -329,33 +329,33 @@
 ---
 
 #### 8. Notificaciones
-**Estado**: 🟡 Modelo implementado, falta lógica
+**Estado**: ✅ COMPLETADO
 
 **Tareas**:
-- [ ] **Notificaciones In-App**
-  - ✅ Bell icon en header con badge de contador
-  - ✅ Dropdown con lista de notificaciones
-  - [ ] Marcar como leído
-  - [ ] Click para ir al thread
+- [x] **Notificaciones In-App** ✅ COMPLETADO
+  - [x] Bell icon en header con badge de contador ✅ COMPLETADO
+  - [x] Dropdown con lista de notificaciones ✅ COMPLETADO
+  - [x] Marcar como leído ✅ COMPLETADO
+  - [x] Click para ir al thread ✅ COMPLETADO
 
-- [ ] **Tipos de Notificaciones**
-  - [ ] Nuevo mensaje en thread asignado
-  - [ ] Thread asignado a ti
-  - [ ] SLA próximo a vencer
-  - [ ] SLA vencido
+- [x] **Tipos de Notificaciones** ✅ COMPLETADO
+  - [x] Nuevo mensaje en thread asignado ✅ COMPLETADO
+  - [x] Thread asignado a ti ✅ COMPLETADO
+  - [x] SLA próximo a vencer ✅ COMPLETADO
+  - [x] SLA vencido ✅ COMPLETADO
   - [ ] Mención en mensaje (futuro)
 
-- [ ] **Lógica de Creación**
-  - [ ] Crear notificación al recibir mensaje (solo para agente asignado)
-  - [ ] Crear notificación al asignar thread
-  - [ ] Crear notificación en SLA warnings
+- [x] **Lógica de Creación** ✅ COMPLETADO
+  - [x] Crear notificación al recibir mensaje (solo para agente asignado) ✅ COMPLETADO
+  - [x] Crear notificación al asignar thread ✅ COMPLETADO
+  - [x] Crear notificación en SLA warnings ✅ COMPLETADO
 
-- [ ] **Server Actions**
-  - [ ] `markNotificationAsRead(notificationId)`
-  - [ ] `markAllAsRead()`
-  - [ ] `getUnreadCount()`
+- [x] **Server Actions** ✅ COMPLETADO
+  - [x] `markNotificationAsRead(notificationId)` ✅ COMPLETADO
+  - [x] `markAllAsRead()` ✅ COMPLETADO
+  - [x] `getUnreadCount()` ✅ COMPLETADO
 
-**Estimación**: 2-3 días
+**Estimación**: 2-3 días (Completado en 1 sesión - Incluye datos de prueba)
 
 ---
 
