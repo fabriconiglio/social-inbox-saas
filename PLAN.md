@@ -363,29 +363,29 @@
 **Estado**: 🟡 Dashboard básico, faltan métricas
 
 **Tareas**:
-- [ ] **Métricas Adicionales**
-  - [ ] Tiempo promedio de primera respuesta
-  - [ ] Tiempo promedio de resolución
-  - [ ] Tasa de cierre de conversaciones
-  - [ ] Mensajes por hora del día
-  - [ ] Picos de volumen
+- [x] **Métricas Adicionales** ✅ COMPLETADO
+  - [x] Tiempo promedio de primera respuesta ✅ COMPLETADO
+  - [x] Tiempo promedio de resolución ✅ COMPLETADO
+  - [x] Tasa de cierre de conversaciones ✅ COMPLETADO
+  - [x] Mensajes por hora del día ✅ COMPLETADO
+  - [x] Picos de volumen ✅ COMPLETADO
 
-- [ ] **Gráficos Mejorados**
-  - [ ] Línea de tiempo de volumen
-  - [ ] Comparación periodo anterior
-  - [ ] Heatmap de horarios
-  - [ ] Funnel de conversaciones
+- [x] **Gráficos Mejorados** ✅ COMPLETADO
+  - [x] Línea de tiempo de volumen ✅ COMPLETADO
+  - [x] Comparación periodo anterior ✅ COMPLETADO
+  - [x] Heatmap de horarios ✅ COMPLETADO
+  - [x] Funnel de conversaciones ✅ COMPLETADO
 
-- [ ] **Exportación de Reportes**
-  - [ ] Botón "Exportar a CSV"
-  - [ ] Botón "Exportar a PDF"
-  - [ ] Selector de rango de fechas
-  - [ ] Filtros personalizables
+- [x] **Exportación de Reportes** ✅ COMPLETADO
+  - [x] Botón "Exportar a CSV" ✅ COMPLETADO
+  - [x] Botón "Exportar a PDF" ✅ COMPLETADO
+  - [x] Selector de rango de fechas ✅ COMPLETADO
+  - [x] Filtros personalizables ✅ COMPLETADO
 
-- [ ] **Métricas por Agente**
-  - [ ] Ranking de agentes
-  - [ ] Tiempo promedio de respuesta por agente
-  - [ ] Cantidad de conversaciones manejadas
+- [x] **Métricas por Agente** ✅ COMPLETADO
+  - [x] Ranking de agentes ✅ COMPLETADO
+  - [x] Tiempo promedio de respuesta por agente ✅ COMPLETADO
+  - [x] Cantidad de conversaciones manejadas ✅ COMPLETADO
   - [ ] Satisfacción del cliente (futuro)
 
 **Estimación**: 3-4 días

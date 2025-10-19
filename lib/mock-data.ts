@@ -352,6 +352,9 @@ export const mockAnalytics = {
   openThreads: 42,
   closedThreads: 98,
   avgResponseTime: 12.5,
+  averageFirstResponseTime: 18,
+  averageResolutionTime: 240,
+  closeRate: 62.8,
   channelData: [
     { name: "Instagram", value: 65 },
     { name: "WhatsApp", value: 52 },
@@ -365,6 +368,781 @@ export const mockAnalytics = {
     { name: "Sin asignar", value: 31 },
   ],
   messageVolume: 1247,
+  hourlyMetrics: Array.from({ length: 24 }, (_, i) => ({
+    hour: i,
+    inbound: Math.floor(Math.random() * 20) + (i >= 9 && i <= 17 ? 15 : 5),
+    outbound: Math.floor(Math.random() * 15) + (i >= 9 && i <= 17 ? 10 : 3),
+    total: 0
+  })).map(item => ({
+    ...item,
+    total: item.inbound + item.outbound
+  })),
+  peakMetrics: {
+    peaks: [
+      {
+        date: "2024-01-15",
+        hour: 14,
+        volume: 45,
+        intensity: "high" as const
+      },
+      {
+        date: "2024-01-16",
+        hour: 10,
+        volume: 38,
+        intensity: "high" as const
+      },
+      {
+        date: "2024-01-17",
+        hour: 16,
+        volume: 32,
+        intensity: "medium" as const
+      },
+      {
+        date: "2024-01-18",
+        hour: 11,
+        volume: 28,
+        intensity: "medium" as const
+      },
+      {
+        date: "2024-01-19",
+        hour: 15,
+        volume: 25,
+        intensity: "low" as const
+      }
+    ],
+    averageVolume: 12.5,
+    maxVolume: 45,
+    peakThreshold: 18.2,
+    patterns: {
+      mostFrequentHours: [
+        { hour: 14, count: 3 },
+        { hour: 10, count: 2 },
+        { hour: 16, count: 2 }
+      ],
+      mostActiveDays: [
+        { date: "2024-01-15", count: 2 },
+        { date: "2024-01-16", count: 1 },
+        { date: "2024-01-17", count: 1 }
+      ],
+      totalPeaks: 5
+    }
+  },
+  timelineMetrics: {
+    timeline: [
+      { period: "2024-01-15", inbound: 45, outbound: 32, total: 77 },
+      { period: "2024-01-16", inbound: 52, outbound: 38, total: 90 },
+      { period: "2024-01-17", inbound: 38, outbound: 28, total: 66 },
+      { period: "2024-01-18", inbound: 61, outbound: 45, total: 106 },
+      { period: "2024-01-19", inbound: 43, outbound: 31, total: 74 },
+      { period: "2024-01-20", inbound: 29, outbound: 18, total: 47 },
+      { period: "2024-01-21", inbound: 35, outbound: 22, total: 57 }
+    ],
+    totalMessages: 517,
+    averagePerPeriod: 73.9,
+    trend: "increasing" as const,
+    granularity: "day" as const
+  },
+  comparisonMetrics: {
+    current: {
+      totalThreads: 156,
+      openThreads: 42,
+      closedThreads: 98,
+      totalMessages: 1247,
+      inboundMessages: 743,
+      outboundMessages: 504,
+      avgResponseTime: 18,
+      closeRate: 62.8,
+      periodLength: 7
+    },
+    previous: {
+      totalThreads: 142,
+      openThreads: 38,
+      closedThreads: 89,
+      totalMessages: 1089,
+      inboundMessages: 621,
+      outboundMessages: 468,
+      avgResponseTime: 22,
+      closeRate: 58.5,
+      periodLength: 7
+    },
+    comparisons: {
+      totalThreads: {
+        current: 156,
+        previous: 142,
+        change: 9.9,
+        changeType: "increase" as const
+      },
+      totalMessages: {
+        current: 1247,
+        previous: 1089,
+        change: 14.5,
+        changeType: "increase" as const
+      },
+      avgResponseTime: {
+        current: 18,
+        previous: 22,
+        change: -18.2,
+        changeType: "decrease" as const
+      },
+      closeRate: {
+        current: 62.8,
+        previous: 58.5,
+        change: 7.4,
+        changeType: "increase" as const
+      },
+      inboundMessages: {
+        current: 743,
+        previous: 621,
+        change: 19.6,
+        changeType: "increase" as const
+      },
+      outboundMessages: {
+        current: 504,
+        previous: 468,
+        change: 7.7,
+        changeType: "increase" as const
+      }
+    },
+    periodInfo: {
+      currentStart: new Date("2024-01-15"),
+      currentEnd: new Date("2024-01-21"),
+      previousStart: new Date("2024-01-08"),
+      previousEnd: new Date("2024-01-14"),
+      comparisonType: "previous_period" as const
+    }
+  },
+  heatmapMetrics: {
+    heatmap: [
+      {
+        day: "Domingo",
+        dayIndex: 0,
+        hours: Array.from({ length: 24 }, (_, i) => ({
+          hour: i,
+          inbound: Math.floor(Math.random() * 5) + (i >= 10 && i <= 14 ? 3 : 0),
+          outbound: Math.floor(Math.random() * 3) + (i >= 10 && i <= 14 ? 2 : 0),
+          total: 0
+        })).map(item => ({ ...item, total: item.inbound + item.outbound }))
+      },
+      {
+        day: "Lunes",
+        dayIndex: 1,
+        hours: Array.from({ length: 24 }, (_, i) => ({
+          hour: i,
+          inbound: Math.floor(Math.random() * 15) + (i >= 9 && i <= 17 ? 10 : 2),
+          outbound: Math.floor(Math.random() * 10) + (i >= 9 && i <= 17 ? 5 : 1),
+          total: 0
+        })).map(item => ({ ...item, total: item.inbound + item.outbound }))
+      },
+      {
+        day: "Martes",
+        dayIndex: 2,
+        hours: Array.from({ length: 24 }, (_, i) => ({
+          hour: i,
+          inbound: Math.floor(Math.random() * 18) + (i >= 9 && i <= 17 ? 12 : 2),
+          outbound: Math.floor(Math.random() * 12) + (i >= 9 && i <= 17 ? 6 : 1),
+          total: 0
+        })).map(item => ({ ...item, total: item.inbound + item.outbound }))
+      },
+      {
+        day: "Miércoles",
+        dayIndex: 3,
+        hours: Array.from({ length: 24 }, (_, i) => ({
+          hour: i,
+          inbound: Math.floor(Math.random() * 20) + (i >= 9 && i <= 17 ? 15 : 2),
+          outbound: Math.floor(Math.random() * 14) + (i >= 9 && i <= 17 ? 8 : 1),
+          total: 0
+        })).map(item => ({ ...item, total: item.inbound + item.outbound }))
+      },
+      {
+        day: "Jueves",
+        dayIndex: 4,
+        hours: Array.from({ length: 24 }, (_, i) => ({
+          hour: i,
+          inbound: Math.floor(Math.random() * 22) + (i >= 9 && i <= 17 ? 18 : 2),
+          outbound: Math.floor(Math.random() * 16) + (i >= 9 && i <= 17 ? 10 : 1),
+          total: 0
+        })).map(item => ({ ...item, total: item.inbound + item.outbound }))
+      },
+      {
+        day: "Viernes",
+        dayIndex: 5,
+        hours: Array.from({ length: 24 }, (_, i) => ({
+          hour: i,
+          inbound: Math.floor(Math.random() * 25) + (i >= 9 && i <= 17 ? 20 : 2),
+          outbound: Math.floor(Math.random() * 18) + (i >= 9 && i <= 17 ? 12 : 1),
+          total: 0
+        })).map(item => ({ ...item, total: item.inbound + item.outbound }))
+      },
+      {
+        day: "Sábado",
+        dayIndex: 6,
+        hours: Array.from({ length: 24 }, (_, i) => ({
+          hour: i,
+          inbound: Math.floor(Math.random() * 8) + (i >= 10 && i <= 16 ? 5 : 1),
+          outbound: Math.floor(Math.random() * 5) + (i >= 10 && i <= 16 ? 3 : 0),
+          total: 0
+        })).map(item => ({ ...item, total: item.inbound + item.outbound }))
+      }
+    ],
+    maxActivity: 45,
+    totalMessages: 2847,
+    peakHours: [
+      { hour: 14, total: 156 },
+      { hour: 10, total: 142 },
+      { hour: 16, total: 138 }
+    ],
+    peakDays: [
+      { day: 5, total: 456 }, // Viernes
+      { day: 4, total: 432 }, // Jueves
+      { day: 3, total: 398 }  // Miércoles
+    ],
+    averagePerHour: 16.9
+  },
+  funnelMetrics: {
+    funnel: {
+      totalThreads: 1247,
+      assignedThreads: 1089,
+      threadsWithAgentResponse: 987,
+      resolvedThreads: 856,
+      openThreads: 158,
+      pendingThreads: 233,
+      closedThreads: 856
+    },
+    conversionRates: {
+      assignmentRate: 87.3,
+      responseRate: 79.2,
+      resolutionRate: 68.6
+    },
+    averageTimes: {
+      timeToAssignment: 12.5, // minutos
+      timeToFirstResponse: 18.7, // minutos
+      timeToResolution: 2.4 // horas
+    },
+    losses: {
+      lostAtAssignment: 158,
+      lostAtResponse: 102,
+      lostAtResolution: 131,
+      lossRateAtAssignment: 12.7,
+      lossRateAtResponse: 9.4,
+      lossRateAtResolution: 13.3
+    },
+    stages: [
+      {
+        name: "Conversaciones Iniciadas",
+        count: 1247,
+        percentage: 100,
+        color: "bg-blue-500"
+      },
+      {
+        name: "Asignadas",
+        count: 1089,
+        percentage: 87.3,
+        color: "bg-yellow-500"
+      },
+      {
+        name: "Con Respuesta",
+        count: 987,
+        percentage: 79.2,
+        color: "bg-orange-500"
+      },
+      {
+        name: "Resueltas",
+        count: 856,
+        percentage: 68.6,
+        color: "bg-green-500"
+      }
+    ]
+  },
+  rankingMetrics: {
+    agents: [
+      {
+        position: 1,
+        agent: {
+          id: "agent-1",
+          name: "María González",
+          email: "maria@example.com"
+        },
+        metrics: {
+          totalThreads: 45,
+          openThreads: 8,
+          closedThreads: 37,
+          totalMessages: 234,
+          inboundMessages: 156,
+          outboundMessages: 78,
+          avgFirstResponseTime: 12.5,
+          avgResolutionTime: 2.3,
+          resolutionRate: 82.2,
+          productivity: 5.2,
+          avgMessageLength: 145,
+          score: 87.5
+        },
+        trend: "top"
+      },
+      {
+        position: 2,
+        agent: {
+          id: "agent-2",
+          name: "Carlos Rodríguez",
+          email: "carlos@example.com"
+        },
+        metrics: {
+          totalThreads: 38,
+          openThreads: 5,
+          closedThreads: 33,
+          totalMessages: 198,
+          inboundMessages: 132,
+          outboundMessages: 66,
+          avgFirstResponseTime: 15.2,
+          avgResolutionTime: 2.8,
+          resolutionRate: 86.8,
+          productivity: 5.2,
+          avgMessageLength: 138,
+          score: 82.3
+        },
+        trend: "top"
+      },
+      {
+        position: 3,
+        agent: {
+          id: "agent-3",
+          name: "Ana Martínez",
+          email: "ana@example.com"
+        },
+        metrics: {
+          totalThreads: 42,
+          openThreads: 12,
+          closedThreads: 30,
+          totalMessages: 189,
+          inboundMessages: 126,
+          outboundMessages: 63,
+          avgFirstResponseTime: 18.7,
+          avgResolutionTime: 3.2,
+          resolutionRate: 71.4,
+          productivity: 4.5,
+          avgMessageLength: 142,
+          score: 75.8
+        },
+        trend: "top"
+      },
+      {
+        position: 4,
+        agent: {
+          id: "agent-4",
+          name: "Luis Fernández",
+          email: "luis@example.com"
+        },
+        metrics: {
+          totalThreads: 31,
+          openThreads: 6,
+          closedThreads: 25,
+          totalMessages: 156,
+          inboundMessages: 104,
+          outboundMessages: 52,
+          avgFirstResponseTime: 22.3,
+          avgResolutionTime: 3.8,
+          resolutionRate: 80.6,
+          productivity: 5.0,
+          avgMessageLength: 128,
+          score: 68.9
+        },
+        trend: "good"
+      },
+      {
+        position: 5,
+        agent: {
+          id: "agent-5",
+          name: "Sofia López",
+          email: "sofia@example.com"
+        },
+        metrics: {
+          totalThreads: 28,
+          openThreads: 9,
+          closedThreads: 19,
+          totalMessages: 134,
+          inboundMessages: 89,
+          outboundMessages: 45,
+          avgFirstResponseTime: 25.1,
+          avgResolutionTime: 4.2,
+          resolutionRate: 67.9,
+          productivity: 4.8,
+          avgMessageLength: 135,
+          score: 62.4
+        },
+        trend: "good"
+      }
+    ],
+    summary: {
+      totalAgents: 5,
+      avgScore: 75.4,
+      topPerformers: [
+        {
+          position: 1,
+          agent: {
+            id: "agent-1",
+            name: "María González",
+            email: "maria@example.com"
+          },
+          metrics: {
+            totalThreads: 45,
+            resolutionRate: 82.2,
+            score: 87.5
+          }
+        },
+        {
+          position: 2,
+          agent: {
+            id: "agent-2",
+            name: "Carlos Rodríguez",
+            email: "carlos@example.com"
+          },
+          metrics: {
+            totalThreads: 38,
+            resolutionRate: 86.8,
+            score: 82.3
+          }
+        },
+        {
+          position: 3,
+          agent: {
+            id: "agent-3",
+            name: "Ana Martínez",
+            email: "ana@example.com"
+          },
+          metrics: {
+            totalThreads: 42,
+            resolutionRate: 71.4,
+            score: 75.8
+          }
+        }
+      ],
+      needsImprovement: [
+        {
+          position: 5,
+          agent: {
+            id: "agent-5",
+            name: "Sofia López",
+            email: "sofia@example.com"
+          },
+          metrics: {
+            totalThreads: 28,
+            resolutionRate: 67.9,
+            score: 62.4
+          }
+        }
+      ]
+    },
+    categories: {
+      byScore: [], // Se llena dinámicamente
+      byThreads: [], // Se llena dinámicamente
+      byResolutionRate: [], // Se llena dinámicamente
+      byResponseTime: [] // Se llena dinámicamente
+    }
+  },
+  volumeMetrics: {
+    agents: [
+      {
+        agent: {
+          id: "agent-1",
+          name: "María González",
+          email: "maria@example.com"
+        },
+        metrics: {
+          totalThreads: 45,
+          openThreads: 8,
+          pendingThreads: 5,
+          closedThreads: 32,
+          totalMessages: 234,
+          inboundMessages: 156,
+          outboundMessages: 78,
+          avgMessagesPerThread: 5.2,
+          avgThreadDuration: 2.3,
+          productivity: 1.5,
+          threadsByDay: {
+            "2024-01-15": 3,
+            "2024-01-16": 4,
+            "2024-01-17": 2,
+            "2024-01-18": 5,
+            "2024-01-19": 3
+          },
+          threadsByHour: {
+            9: 2, 10: 3, 11: 4, 14: 5, 15: 3, 16: 2
+          },
+          threadsByStatus: {
+            "OPEN": 8,
+            "PENDING": 5,
+            "CLOSED": 32
+          }
+        }
+      },
+      {
+        agent: {
+          id: "agent-2",
+          name: "Carlos Rodríguez",
+          email: "carlos@example.com"
+        },
+        metrics: {
+          totalThreads: 38,
+          openThreads: 5,
+          pendingThreads: 3,
+          closedThreads: 30,
+          totalMessages: 198,
+          inboundMessages: 132,
+          outboundMessages: 66,
+          avgMessagesPerThread: 5.2,
+          avgThreadDuration: 2.8,
+          productivity: 1.3,
+          threadsByDay: {
+            "2024-01-15": 2,
+            "2024-01-16": 3,
+            "2024-01-17": 4,
+            "2024-01-18": 3,
+            "2024-01-19": 2
+          },
+          threadsByHour: {
+            8: 1, 9: 2, 10: 3, 13: 4, 14: 3, 15: 2
+          },
+          threadsByStatus: {
+            "OPEN": 5,
+            "PENDING": 3,
+            "CLOSED": 30
+          }
+        }
+      },
+      {
+        agent: {
+          id: "agent-3",
+          name: "Ana Martínez",
+          email: "ana@example.com"
+        },
+        metrics: {
+          totalThreads: 42,
+          openThreads: 12,
+          pendingThreads: 4,
+          closedThreads: 26,
+          totalMessages: 189,
+          inboundMessages: 126,
+          outboundMessages: 63,
+          avgMessagesPerThread: 4.5,
+          avgThreadDuration: 3.2,
+          productivity: 1.4,
+          threadsByDay: {
+            "2024-01-15": 4,
+            "2024-01-16": 3,
+            "2024-01-17": 2,
+            "2024-01-18": 4,
+            "2024-01-19": 3
+          },
+          threadsByHour: {
+            9: 3, 10: 2, 11: 4, 14: 3, 15: 4, 16: 3
+          },
+          threadsByStatus: {
+            "OPEN": 12,
+            "PENDING": 4,
+            "CLOSED": 26
+          }
+        }
+      },
+      {
+        agent: {
+          id: "agent-4",
+          name: "Luis Fernández",
+          email: "luis@example.com"
+        },
+        metrics: {
+          totalThreads: 31,
+          openThreads: 6,
+          pendingThreads: 2,
+          closedThreads: 23,
+          totalMessages: 156,
+          inboundMessages: 104,
+          outboundMessages: 52,
+          avgMessagesPerThread: 5.0,
+          avgThreadDuration: 3.8,
+          productivity: 1.0,
+          threadsByDay: {
+            "2024-01-15": 2,
+            "2024-01-16": 1,
+            "2024-01-17": 3,
+            "2024-01-18": 2,
+            "2024-01-19": 1
+          },
+          threadsByHour: {
+            8: 1, 9: 2, 10: 1, 13: 2, 14: 1, 15: 2
+          },
+          threadsByStatus: {
+            "OPEN": 6,
+            "PENDING": 2,
+            "CLOSED": 23
+          }
+        }
+      },
+      {
+        agent: {
+          id: "agent-5",
+          name: "Sofia López",
+          email: "sofia@example.com"
+        },
+        metrics: {
+          totalThreads: 28,
+          openThreads: 9,
+          pendingThreads: 3,
+          closedThreads: 16,
+          totalMessages: 134,
+          inboundMessages: 89,
+          outboundMessages: 45,
+          avgMessagesPerThread: 4.8,
+          avgThreadDuration: 4.2,
+          productivity: 0.9,
+          threadsByDay: {
+            "2024-01-15": 1,
+            "2024-01-16": 2,
+            "2024-01-17": 1,
+            "2024-01-18": 2,
+            "2024-01-19": 1
+          },
+          threadsByHour: {
+            9: 1, 10: 1, 11: 2, 14: 1, 15: 1, 16: 1
+          },
+          threadsByStatus: {
+            "OPEN": 9,
+            "PENDING": 3,
+            "CLOSED": 16
+          }
+        }
+      }
+    ],
+    summary: {
+      totalAgents: 5,
+      totalThreads: 184,
+      totalMessages: 911,
+      avgThreadsPerAgent: 36.8,
+      avgMessagesPerThread: 4.95
+    },
+    topPerformers: {
+      byVolume: [
+        {
+          agent: {
+            id: "agent-1",
+            name: "María González",
+            email: "maria@example.com"
+          },
+          metrics: {
+            totalThreads: 45,
+            totalMessages: 234
+          }
+        },
+        {
+          agent: {
+            id: "agent-3",
+            name: "Ana Martínez",
+            email: "ana@example.com"
+          },
+          metrics: {
+            totalThreads: 42,
+            totalMessages: 189
+          }
+        },
+        {
+          agent: {
+            id: "agent-2",
+            name: "Carlos Rodríguez",
+            email: "carlos@example.com"
+          },
+          metrics: {
+            totalThreads: 38,
+            totalMessages: 198
+          }
+        }
+      ],
+      byMessages: [
+        {
+          agent: {
+            id: "agent-1",
+            name: "María González",
+            email: "maria@example.com"
+          },
+          metrics: {
+            totalMessages: 234,
+            totalThreads: 45
+          }
+        },
+        {
+          agent: {
+            id: "agent-2",
+            name: "Carlos Rodríguez",
+            email: "carlos@example.com"
+          },
+          metrics: {
+            totalMessages: 198,
+            totalThreads: 38
+          }
+        },
+        {
+          agent: {
+            id: "agent-3",
+            name: "Ana Martínez",
+            email: "ana@example.com"
+          },
+          metrics: {
+            totalMessages: 189,
+            totalThreads: 42
+          }
+        }
+      ],
+      byProductivity: [
+        {
+          agent: {
+            id: "agent-1",
+            name: "María González",
+            email: "maria@example.com"
+          },
+          metrics: {
+            productivity: 1.5,
+            avgThreadDuration: 2.3
+          }
+        },
+        {
+          agent: {
+            id: "agent-3",
+            name: "Ana Martínez",
+            email: "ana@example.com"
+          },
+          metrics: {
+            productivity: 1.4,
+            avgThreadDuration: 3.2
+          }
+        },
+        {
+          agent: {
+            id: "agent-2",
+            name: "Carlos Rodríguez",
+            email: "carlos@example.com"
+          },
+          metrics: {
+            productivity: 1.3,
+            avgThreadDuration: 2.8
+          }
+        }
+      ]
+    },
+    distribution: {
+      byStatus: {
+        open: 40,
+        pending: 17,
+        closed: 127
+      },
+      byHour: {
+        8: 2, 9: 8, 10: 12, 11: 10, 13: 6, 14: 15, 15: 13, 16: 8
+      },
+      byDay: {
+        "2024-01-15": 12,
+        "2024-01-16": 14,
+        "2024-01-17": 12,
+        "2024-01-18": 16,
+        "2024-01-19": 10
+      }
+    }
+  }
 }
 
 export const mockContacts = [
