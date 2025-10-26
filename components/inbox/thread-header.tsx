@@ -25,6 +25,8 @@ import {
 import { SidebarOpen, UserPlus, UserMinus, User, Circle, Clock, CheckCircle2 } from "lucide-react"
 import { assignThread, unassignThread, listTenantAgents } from "@/app/actions/thread-assignment"
 import { updateThreadStatus } from "@/app/actions/thread-status"
+import { ThreadHeaderTypingIndicator } from "@/components/ui/typing-indicator"
+import { useTypingIndicator } from "@/hooks/use-typing-indicator"
 import { toast } from "sonner"
 import type { Channel, Local, Thread, User, Contact } from "@prisma/client"
 
@@ -45,6 +47,9 @@ export function ThreadHeader({ thread, onToggleSidebar, tenantId, currentUserId 
   const [loading, setLoading] = useState(false)
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<"OPEN" | "PENDING" | "CLOSED" | null>(null)
+  
+  // Hook para indicador de escritura
+  const { typingUsers } = useTypingIndicator(thread.id, tenantId)
 
   useEffect(() => {
     loadAgents()
@@ -183,9 +188,12 @@ export function ThreadHeader({ thread, onToggleSidebar, tenantId, currentUserId 
         </Avatar>
         <div>
           <h3 className="font-semibold">{thread.contact?.name || thread.contact?.handle || "Desconocido"}</h3>
-          <p className="text-sm text-muted-foreground">
-            {thread.channel.displayName} • {thread.local.name}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-muted-foreground">
+              {thread.channel.displayName} • {thread.local.name}
+            </p>
+            <ThreadHeaderTypingIndicator typingUsers={typingUsers} />
+          </div>
         </div>
 
         {/* Dropdown de Estado */}

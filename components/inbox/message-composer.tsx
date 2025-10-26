@@ -25,6 +25,8 @@ import { useImageOptimization, useImageDetection } from "@/hooks/use-image-optim
 import { useVideoOptimization, useVideoDetection } from "@/hooks/use-video-optimization"
 import { useDocumentOptimization, useDocumentDetection } from "@/hooks/use-document-optimization"
 import { useAudioOptimization, useAudioDetection } from "@/hooks/use-audio-optimization"
+import { useTypingIndicator } from "@/hooks/use-typing-indicator"
+import { TypingIndicator } from "@/components/ui/typing-indicator"
 
 interface Attachment {
   id: string
@@ -61,6 +63,7 @@ export function MessageComposer({ threadId, channelId, tenantId, userId, channel
   const { isDocumentFile, isSupportedDocumentType } = useDocumentDetection()
   const { optimizeAudio, isOptimizing: audioOptimizing } = useAudioOptimization()
   const { isAudioFile, isSupportedAudioType } = useAudioDetection()
+  const { typingUsers, handleInputChange, handleInputBlur } = useTypingIndicator(threadId, tenantId)
   
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
@@ -256,22 +259,37 @@ export function MessageComposer({ threadId, channelId, tenantId, userId, channel
     setUploading(true)
     
     try {
-      const formData = new FormData()
-      formData.append("threadId", threadId)
-      formData.append("channelId", channelId)
-      formData.append("body", message)
-
-      // Agregar adjuntos al FormData
+      // Determinar el tipo de mensaje basado en los adjuntos
+      let messageType: "text" | "image" | "video" | "document" | "audio" = "text"
       if (attachments.length > 0) {
-        formData.append("attachments", JSON.stringify(attachments.map(a => ({
-          name: a.name,
-          size: a.size,
-          type: a.type,
-          storageFile: a.storageFile
-        }))))
+        const firstAttachment = attachments[0]
+        if (isImageFile(firstAttachment.file)) {
+          messageType = "image"
+        } else if (isVideoFile(firstAttachment.file)) {
+          messageType = "video"
+        } else if (isAudioFile(firstAttachment.file)) {
+          messageType = "audio"
+        } else {
+          messageType = "document"
+        }
       }
 
-      const result = await sendMessage(formData)
+      // Preparar adjuntos para la server action
+      const attachmentData = attachments.map(a => ({
+        type: a.type,
+        url: a.storageFile?.url || '',
+        filename: a.name,
+        size: a.size
+      }))
+
+      const result = await sendMessage({
+        threadId,
+        channelId,
+        content: message,
+        tenantId,
+        messageType,
+        attachments: attachmentData
+      })
 
       if (result.success) {
         setMessage("")
@@ -488,7 +506,11 @@ export function MessageComposer({ threadId, channelId, tenantId, userId, channel
           <Textarea
             placeholder="Escribe un mensaje..."
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => {
+              setMessage(e.target.value)
+              handleInputChange(e.target.value)
+            }}
+            onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
             className="min-h-[60px] resize-none"
             disabled={sending}
@@ -543,6 +565,13 @@ export function MessageComposer({ threadId, channelId, tenantId, userId, channel
           showVariables={false}
           showValidation={true}
           compact={true}
+        />
+        
+        {/* Indicador de escritura */}
+        <TypingIndicator 
+          users={typingUsers}
+          compact={true}
+          className="mt-2"
         />
       </div>
     </div>

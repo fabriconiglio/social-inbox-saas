@@ -446,29 +446,15 @@
 
 ---
 
-#### 13. Invitación de Usuarios
-**Estado**: 🔴 No implementado
-
-**Tareas**:
-- [ ] Formulario para invitar usuarios por email
-- [ ] Envío de email con link de invitación
-- [ ] Página de aceptar invitación
-- [ ] Asignar rol al aceptar
-- [ ] Gestión de invitaciones pendientes
-
-**Estimación**: 2-3 días
-
----
-
 #### 14. Real-time con Socket.IO
 **Estado**: 🔴 No implementado (usa polling)
 
 **Tareas**:
-- [ ] Instalar y configurar Socket.IO
-- [ ] Implementar eventos: `new-message`, `thread-updated`, `typing`
-- [ ] Conectar cliente al socket
-- [ ] Mostrar indicador de "escribiendo..."
-- [ ] Actualizar UI en tiempo real sin polling
+- [x] ✅ COMPLETADO - Instalar y configurar Socket.IO
+- [x] ✅ COMPLETADO - Implementar eventos: `new-message`, `thread-updated`, `typing`
+- [x] ✅ COMPLETADO - Conectar cliente al socket
+- [x] ✅ COMPLETADO - Mostrar indicador de "escribiendo..."
+- [x] ✅ COMPLETADO - Actualizar UI en tiempo real sin polling
 
 **Estimación**: 2-3 días
 
@@ -488,16 +474,6 @@
 **Estimación**: 5-7 días
 
 ---
-
-#### 16. Integraciones CRM
-**Estado**: 🔴 No implementado
-
-**Tareas**:
-- [ ] Integración con Salesforce
-- [ ] Integración con HubSpot
-- [ ] Integración con Pipedrive
-- [ ] Sincronización bidireccional de contactos
-- [ ] Crear leads/oportunidades desde conversaciones
 
 **Estimación**: 10+ días (por integración)
 

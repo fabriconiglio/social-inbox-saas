@@ -5,6 +5,7 @@ import { requireAuth, checkTenantAccess } from "@/lib/auth-utils"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createAuditLogger, AUDIT_ACTIONS, AuditDiff } from "@/lib/audit-log-utils"
+import { emitThreadUpdated, emitNotification } from "@/lib/socket-events"
 
 export async function updateThread(formData: FormData) {
   try {
@@ -56,6 +57,49 @@ export async function updateThread(formData: FormData) {
       AUDIT_ACTIONS.THREAD.UPDATED,
       diff
     )
+
+    // Emitir evento de Socket.IO
+    const changes: any = {}
+    if (updateData.status) changes.status = updateData.status
+    if (updateData.assigneeId) {
+      changes.assigneeId = updateData.assigneeId
+      // Obtener nombre del asignado
+      if (updateData.assigneeId) {
+        const assignee = await prisma.user.findUnique({
+          where: { id: updateData.assigneeId },
+          select: { name: true }
+        })
+        changes.assigneeName = assignee?.name || 'Usuario desconocido'
+      }
+    }
+    if (updateData.priority) changes.priority = updateData.priority
+    if (updateData.tags) changes.tags = updateData.tags
+    if (updateData.notes) changes.notes = updateData.notes
+
+    // Obtener nombre del usuario que actualizó
+    const updatedBy = await prisma.user.findUnique({
+      where: { id: user.id! },
+      select: { name: true }
+    })
+
+    emitThreadUpdated({
+      threadId,
+      changes,
+      updatedBy: user.id!,
+      updatedByName: updatedBy?.name || 'Usuario desconocido',
+      timestamp: new Date().toISOString(),
+      tenantId: thread.tenantId
+    })
+
+    // Emitir notificación si es una asignación
+    if (updateData.assigneeId && updateData.assigneeId !== oldThread.assigneeId) {
+      emitNotification(thread.tenantId, {
+        type: 'info',
+        title: 'Thread asignado',
+        message: `El thread ${threadId} ha sido asignado a ${changes.assigneeName}`,
+        actionUrl: `/app/${thread.tenantId}/inbox?thread=${threadId}`
+      })
+    }
 
     revalidatePath(`/app/${thread.tenantId}/inbox`)
     return { success: true }

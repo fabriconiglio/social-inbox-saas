@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Bell, Check, CheckCheck, Trash2, UserPlus, UserMinus, Clock, AlertTriangle, MessageCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { listNotifications, getUnreadCount, markNotificationAsRead, markAllAsRead, deleteNotification } from "@/app/actions/notifications"
+import { useRealtimeNotifications } from "@/hooks/use-realtime-notifications"
+import { useSocketConnection } from "@/hooks/use-socket-connection"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
