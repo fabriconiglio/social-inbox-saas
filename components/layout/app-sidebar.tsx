@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Inbox, BarChart3, Users, Settings, Building2, Radio } from "lucide-react"
+import { Inbox, BarChart3, Users, Settings, Building2, Radio, History } from "lucide-react"
 
 interface AppSidebarProps {
   tenantId: string
@@ -19,6 +19,7 @@ export function AppSidebar({ tenantId, userRole }: AppSidebarProps) {
     { href: `/app/${tenantId}/contacts`, label: "Contactos", icon: Users },
     { href: `/app/${tenantId}/channels`, label: "Canales", icon: Radio, adminOnly: true },
     { href: `/app/${tenantId}/locals`, label: "Locales", icon: Building2, adminOnly: true },
+    { href: `/app/${tenantId}/audit`, label: "Auditoría", icon: History, adminOnly: true },
     { href: `/app/${tenantId}/settings`, label: "Configuración", icon: Settings, adminOnly: true },
   ]
 

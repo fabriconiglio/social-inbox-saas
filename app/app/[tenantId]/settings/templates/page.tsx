@@ -8,7 +8,9 @@ import { SyncStatus } from "@/components/templates/sync-status"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { FileText, CheckCircle, Clock, BarChart3 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { FileText, CheckCircle, Clock, BarChart3, History } from "lucide-react"
+import Link from "next/link"
 
 interface TemplatesPageProps {
   params: {
@@ -146,11 +148,19 @@ export default async function TemplatesPage({ params, searchParams }: TemplatesP
   
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Gestión de Plantillas</h1>
-        <p className="text-muted-foreground">
-          Administra las plantillas de mensajes para WhatsApp, Instagram y otros canales.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Gestión de Plantillas</h1>
+          <p className="text-muted-foreground">
+            Administra las plantillas de mensajes para WhatsApp, Instagram y otros canales.
+          </p>
+        </div>
+        <Link href={`/app/${params.tenantId}/audit?entity=Template`}>
+          <Button variant="outline">
+            <History className="h-4 w-4 mr-2" />
+            Historial
+          </Button>
+        </Link>
       </div>
       
       <Suspense fallback={<TemplatesStatsSkeleton />}>

@@ -2,7 +2,9 @@ import { Metadata } from "next"
 import { getChannels, getLocals } from "@/app/actions/channels"
 import { ChannelCard } from "@/components/channels/channel-card"
 import { ConnectChannelButton } from "@/components/channels/connect-channel-button"
-import { Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Plus, History } from "lucide-react"
+import Link from "next/link"
 
 export const metadata: Metadata = {
   title: "Canales | MessageHub",
@@ -42,7 +44,15 @@ export default async function ChannelsPage({
             Gestiona tus canales de mensajería conectados
           </p>
         </div>
-        <ConnectChannelButton tenantId={params.tenantId} locals={locals} />
+        <div className="flex items-center gap-2">
+          <Link href={`/app/${params.tenantId}/audit?entity=Channel`}>
+            <Button variant="outline">
+              <History className="h-4 w-4 mr-2" />
+              Historial
+            </Button>
+          </Link>
+          <ConnectChannelButton tenantId={params.tenantId} locals={locals} />
+        </div>
       </div>
 
       {/* Stats */}

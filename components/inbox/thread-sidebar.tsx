@@ -9,6 +9,8 @@ import { updateThread } from "@/app/actions/threads"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { ThreadAuditLog } from "@/components/inbox/thread-audit-log"
+import { AuditLogHistory } from "@/components/audit/audit-log-history"
+import { History } from "lucide-react"
 import type { Channel, Local, Thread, User, Contact, Membership } from "@prisma/client"
 
 interface ThreadSidebarProps {
@@ -141,7 +143,26 @@ export function ThreadSidebar({ thread, tenantId, userId, userRole, members }: T
         </TabsContent>
 
         <TabsContent value="history" className="h-full p-0">
-          <ThreadAuditLog tenantId={tenantId} threadId={thread.id} />
+          <div className="h-full flex flex-col">
+            <div className="p-4 border-b">
+              <div className="flex items-center gap-2 mb-2">
+                <History className="h-4 w-4" />
+                <h3 className="font-semibold">Historial de Auditoría</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Registro de cambios en este thread
+              </p>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <AuditLogHistory
+                tenantId={tenantId}
+                entity="Thread"
+                entityId={thread.id}
+                limit={20}
+                compact={true}
+              />
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

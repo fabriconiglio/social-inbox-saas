@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
 import { createMetaAPIService, MetaCredentialsManager } from "@/lib/meta-api"
+import { createAuditLogger, AUDIT_ACTIONS, AuditDiff } from "@/lib/audit-log-utils"
 
 // Schemas de validación
 const CreateTemplateSchema = z.object({
@@ -58,6 +59,19 @@ export async function createTemplate(data: z.infer<typeof CreateTemplateSchema>)
       }
     })
     
+    // Registrar en audit log
+    const auditLogger = createAuditLogger(data.tenantId)
+    await auditLogger.logTemplateAction(
+      template.id,
+      AUDIT_ACTIONS.TEMPLATE.CREATED,
+      {
+        name: template.name,
+        channelType: template.channelType,
+        approvedTag: template.approvedTag,
+        hasContent: !!template.contentJSON
+      }
+    )
+    
     revalidatePath(`/app/${data.tenantId}/settings/templates`)
     
     return { success: true, data: template }
@@ -100,6 +114,9 @@ export async function updateTemplate(data: z.infer<typeof UpdateTemplateSchema>)
     
     const { id, ...updateData } = validated.data
     
+    // Crear diff antes de la actualización
+    const diff = AuditDiff.createFieldDiff(existingTemplate, { ...existingTemplate, ...updateData }, Object.keys(updateData))
+    
     const template = await prisma.template.update({
       where: { id },
       data: updateData,
@@ -109,6 +126,14 @@ export async function updateTemplate(data: z.infer<typeof UpdateTemplateSchema>)
         }
       }
     })
+    
+    // Registrar en audit log
+    const auditLogger = createAuditLogger(data.tenantId!)
+    await auditLogger.logTemplateAction(
+      template.id,
+      AUDIT_ACTIONS.TEMPLATE.UPDATED,
+      diff
+    )
     
     revalidatePath(`/app/${data.tenantId}/settings/templates`)
     

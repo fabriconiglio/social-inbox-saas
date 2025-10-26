@@ -437,10 +437,10 @@
 **Estado**: 🟡 Modelo implementado, falta lógica
 
 **Tareas**:
-- [ ] Registrar acciones importantes en AuditLog
-- [ ] UI para ver historial de cambios
-- [ ] Filtrar por entidad/usuario/fecha
-- [ ] Exportar audit logs
+- [x] ✅ COMPLETADO - Registrar acciones importantes en AuditLog
+- [x] ✅ COMPLETADO - UI para ver historial de cambios
+- [x] ✅ COMPLETADO - Filtrar por entidad/usuario/fecha
+- [x] ✅ COMPLETADO - Exportar audit logs
 
 **Estimación**: 2 días
 

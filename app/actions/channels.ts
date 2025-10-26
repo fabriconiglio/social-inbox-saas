@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { getAdapter } from "@/lib/adapters"
 import { ChannelCredentialsService } from "@/lib/channel-credentials"
 import { ChannelCredentials } from "@/lib/types/channel-credentials"
+import { createAuditLogger, AUDIT_ACTIONS, AuditDiff } from "@/lib/audit-log-utils"
 
 export async function getChannels(tenantId: string) {
   try {
@@ -182,6 +183,20 @@ export async function connectChannel(data: {
       }
     }
 
+    // Registrar en audit log
+    const auditLogger = createAuditLogger(data.tenantId)
+    await auditLogger.logChannelAction(
+      channel.id,
+      AUDIT_ACTIONS.CHANNEL.CREATED,
+      {
+        channelType: data.type,
+        localId: data.localId,
+        displayName: data.displayName,
+        status: "ACTIVE",
+        hasCredentials: data.type !== "MOCK" && Object.keys(data.config).length > 0
+      }
+    )
+
     revalidatePath(`/app/${data.tenantId}/channels`)
     return { success: true, channelId: channel.id }
   } catch (error) {
@@ -345,6 +360,17 @@ export async function saveCredentials(data: {
     const result = await ChannelCredentialsService.saveChannelCredentials(data)
     
     if (result.success) {
+      // Registrar en audit log
+      const auditLogger = createAuditLogger(data.tenantId)
+      await auditLogger.logChannelAction(
+        data.channelId,
+        AUDIT_ACTIONS.CHANNEL.CREDENTIALS_UPDATED,
+        {
+          hasCredentials: !!data.credentials,
+          credentialFields: Object.keys(data.credentials)
+        }
+      )
+      
       revalidatePath(`/app/${data.tenantId}/channels`)
     }
     
@@ -377,6 +403,17 @@ export async function validateStoredChannelCredentials(data: {
     const result = await ChannelCredentialsService.validateStoredCredentials(data)
     
     if (result.success) {
+      // Registrar en audit log
+      const auditLogger = createAuditLogger(data.tenantId)
+      await auditLogger.logChannelAction(
+        data.channelId,
+        AUDIT_ACTIONS.CHANNEL.CREDENTIALS_VALIDATED,
+        {
+          valid: result.valid,
+          hasCredentials: result.valid
+        }
+      )
+      
       revalidatePath(`/app/${data.tenantId}/channels`)
     }
     

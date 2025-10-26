@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { requireAuth, checkTenantAccess } from "@/lib/auth-utils"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+import { createAuditLogger, AUDIT_ACTIONS, AuditDiff } from "@/lib/audit-log-utils"
 
 export async function updateThread(formData: FormData) {
   try {
@@ -39,22 +40,22 @@ export async function updateThread(formData: FormData) {
       updateData.status = status
     }
 
+    const oldThread = { ...thread }
+    
     await prisma.thread.update({
       where: { id: threadId },
       data: updateData,
     })
 
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        tenantId: thread.tenantId,
-        actorId: user.id,
-        action: "thread.updated",
-        entity: "Thread",
-        entityId: threadId,
-        diffJSON: updateData,
-      },
-    })
+    // Registrar en audit log con diff detallado
+    const auditLogger = createAuditLogger(thread.tenantId)
+    const diff = AuditDiff.createFieldDiff(oldThread, { ...oldThread, ...updateData }, Object.keys(updateData))
+    
+    await auditLogger.logThreadAction(
+      threadId,
+      AUDIT_ACTIONS.THREAD.UPDATED,
+      diff
+    )
 
     revalidatePath(`/app/${thread.tenantId}/inbox`)
     return { success: true }
@@ -175,22 +176,20 @@ export async function createThread(data: z.infer<typeof createThreadSchema>) {
       },
     })
 
-    // Registrar en AuditLog
-    await prisma.auditLog.create({
-      data: {
-        tenantId: data.tenantId,
-        actorId: user.id,
-        action: "thread.created",
-        entity: "Thread",
-        entityId: thread.id,
-        diffJSON: {
-          contactId: data.contactId,
-          channelId: data.channelId,
-          assigneeId: data.assigneeId,
-          subject: data.subject,
-        },
-      },
-    })
+    // Registrar en audit log
+    const auditLogger = createAuditLogger(data.tenantId)
+    await auditLogger.logThreadAction(
+      thread.id,
+      AUDIT_ACTIONS.THREAD.CREATED,
+      {
+        contactId: data.contactId,
+        channelId: data.channelId,
+        assigneeId: data.assigneeId,
+        subject: data.subject,
+        externalId,
+        status: "OPEN"
+      }
+    )
 
     // Crear notificación si se asigna a otro usuario
     if (data.assigneeId && data.assigneeId !== user.id) {
