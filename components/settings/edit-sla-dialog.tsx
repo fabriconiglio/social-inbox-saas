@@ -17,6 +17,20 @@ import { toast } from "sonner"
 import { getSLAForEdit, updateSLA, deleteSLA, duplicateSLA, type EditSLAData } from "@/app/actions/sla-edit"
 import { ResponseTimeConfig } from "./response-time-config"
 import { SLAPreview } from "./sla-preview"
+import { DailyScheduleConfig } from "./daily-schedule-config"
+import { SchedulePreview } from "./schedule-preview"
+import { SLAImpactPreview } from "./sla-impact-preview"
+import { SLATimeline } from "./sla-timeline"
+
+const DAYS = [
+  { value: 0, label: "Domingo", short: "Dom", isWeekend: true },
+  { value: 1, label: "Lunes", short: "Lun", isWeekend: false },
+  { value: 2, label: "Martes", short: "Mar", isWeekend: false },
+  { value: 3, label: "Miércoles", short: "Mié", isWeekend: false },
+  { value: 4, label: "Jueves", short: "Jue", isWeekend: false },
+  { value: 5, label: "Viernes", short: "Vie", isWeekend: false },
+  { value: 6, label: "Sábado", short: "Sáb", isWeekend: true }
+]
 
 interface EditSLADialogProps {
   slaId: string
@@ -125,7 +139,7 @@ export function EditSLADialog({ slaId, onSLAUpdated, trigger }: EditSLADialogPro
     setFormData(prev => ({
       ...prev,
       [parent]: {
-        ...prev[parent as keyof typeof prev],
+        ...(prev[parent as keyof typeof prev] as any),
         [field]: value
       }
     }))
@@ -373,79 +387,75 @@ export function EditSLADialog({ slaId, onSLAUpdated, trigger }: EditSLADialogPro
                 </CardContent>
               </Card>
 
-              {/* Horarios de Negocio */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Horarios de Negocio</CardTitle>
-                  <CardDescription>Configura si el SLA solo aplica durante horarios específicos</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="businessHoursEnabled"
-                      checked={formData.businessHours?.enabled || false}
-                      onCheckedChange={(checked) => handleNestedChange("businessHours", "enabled", checked)}
-                    />
-                    <Label htmlFor="businessHoursEnabled">Aplicar solo en horarios de negocio</Label>
-                  </div>
+              {/* Horarios de Atención por Día */}
+              <DailyScheduleConfig
+                schedules={formData.businessHours?.enabled ? 
+                  DAYS.map(day => ({
+                    day: day.value,
+                    enabled: formData.businessHours?.workingDays?.includes(day.value) || false,
+                    startTime: formData.businessHours?.startTime || "09:00",
+                    endTime: formData.businessHours?.endTime || "18:00",
+                    timezone: formData.businessHours?.timezone || "America/Argentina/Cordoba"
+                  })) : 
+                  DAYS.map(day => ({
+                    day: day.value,
+                    enabled: !day.isWeekend,
+                    startTime: "09:00",
+                    endTime: "18:00",
+                    timezone: "America/Argentina/Cordoba"
+                  }))
+                }
+                onChange={(schedules) => {
+                  const enabled = schedules.some(s => s.enabled)
+                  const workingDays = schedules.filter(s => s.enabled).map(s => s.day)
+                  const startTime = schedules.find(s => s.enabled)?.startTime || "09:00"
+                  const endTime = schedules.find(s => s.enabled)?.endTime || "18:00"
+                  
+                  handleInputChange("businessHours", {
+                    enabled,
+                    startTime,
+                    endTime,
+                    timezone: "America/Argentina/Cordoba",
+                    workingDays
+                  })
+                }}
+              />
 
-                  {formData.businessHours?.enabled && (
-                    <div className="space-y-4 pl-6 border-l-2 border-muted">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="startTime">Hora de inicio</Label>
-                          <Input
-                            id="startTime"
-                            type="time"
-                            value={formData.businessHours?.startTime || "09:00"}
-                            onChange={(e) => handleNestedChange("businessHours", "startTime", e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="endTime">Hora de fin</Label>
-                          <Input
-                            id="endTime"
-                            type="time"
-                            value={formData.businessHours?.endTime || "18:00"}
-                            onChange={(e) => handleNestedChange("businessHours", "endTime", e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <Label>Días de trabajo</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {[
-                            { value: 0, label: "Dom" },
-                            { value: 1, label: "Lun" },
-                            { value: 2, label: "Mar" },
-                            { value: 3, label: "Mié" },
-                            { value: 4, label: "Jue" },
-                            { value: 5, label: "Vie" },
-                            { value: 6, label: "Sáb" }
-                          ].map(day => (
-                            <Button
-                              key={day.value}
-                              variant={formData.businessHours?.workingDays?.includes(day.value) ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => {
-                                const currentDays = formData.businessHours?.workingDays || []
-                                const newDays = currentDays.includes(day.value)
-                                  ? currentDays.filter(d => d !== day.value)
-                                  : [...currentDays, day.value]
-                                handleNestedChange("businessHours", "workingDays", newDays)
-                              }}
-                            >
-                              {day.label}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {errors.businessHours && <p className="text-sm text-red-500">{errors.businessHours}</p>}
-                </CardContent>
-              </Card>
+              {/* Preview de Horarios */}
+              <SchedulePreview
+                schedules={formData.businessHours?.enabled ? 
+                  DAYS.map(day => ({
+                    day: day.value,
+                    enabled: formData.businessHours?.workingDays?.includes(day.value) || false,
+                    startTime: formData.businessHours?.startTime || "09:00",
+                    endTime: formData.businessHours?.endTime || "18:00",
+                    timezone: formData.businessHours?.timezone || "America/Argentina/Cordoba"
+                  })) : 
+                  DAYS.map(day => ({
+                    day: day.value,
+                    enabled: !day.isWeekend,
+                    startTime: "09:00",
+                    endTime: "18:00",
+                    timezone: "America/Argentina/Cordoba"
+                  }))
+                }
+              />
+
+              {/* Preview de Impacto del SLA */}
+              <SLAImpactPreview
+                responseTimeMinutes={formData.responseTimeMinutes}
+                resolutionTimeHours={formData.resolutionTimeHours}
+                businessHours={formData.businessHours}
+                priority={formData.priority}
+              />
+
+              {/* Timeline del SLA */}
+              <SLATimeline
+                responseTimeMinutes={formData.responseTimeMinutes}
+                resolutionTimeHours={formData.resolutionTimeHours}
+                businessHours={formData.businessHours}
+                priority={formData.priority}
+              />
 
               {/* Reglas de Escalación */}
               <Card>

@@ -399,19 +399,19 @@
 - [x] **UI de Configuración** ✅ COMPLETADO
   - [x] Formulario para editar SLA existente ✅ COMPLETADO
   - [x] Configurar tiempo de primera respuesta ✅ COMPLETADO
-  - [ ] Configurar horarios de atención por día
-  - [ ] Toggle para horarios 24/7
-  - [ ] Preview de cómo afecta el SLA
+  - [x] ✅ COMPLETADO - Configurar horarios de atención por día
+  - [x] ✅ COMPLETADO - Toggle para horarios 24/7
+  - [x] ✅ COMPLETADO - Preview de cómo afecta el SLA
 
 - [ ] **SLA por Canal/Local**
-  - [ ] Permitir SLAs diferentes por tipo de canal
-  - [ ] Permitir SLAs diferentes por local
-  - [ ] Jerarquía: Local > Canal > Tenant
+  - [x] ✅ COMPLETADO - Permitir SLAs diferentes por tipo de canal
+  - [x] ✅ COMPLETADO - Permitir SLAs diferentes por local
+  - [x] ✅ COMPLETADO - Jerarquía: Local > Canal > Tenant
 
 - [ ] **Alertas de SLA**
-  - [ ] Notificación cuando SLA está por vencer (75%)
-  - [ ] Notificación cuando SLA vence
-  - [ ] Destacar visualmente threads con SLA vencido
+  - [x] ✅ COMPLETADO - Notificación cuando SLA está por vencer (75%)
+  - [x] ✅ COMPLETADO - Notificación cuando SLA vence
+  - [x] ✅ COMPLETADO - Destacar visualmente threads con SLA vencido
 
 **Estimación**: 2 días
 

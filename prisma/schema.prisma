@@ -26,6 +26,8 @@ model Tenant {
   slas            SLA[]
   auditLogs       AuditLog[]
   templates       Template[]
+  channelSLAConfigs ChannelSLAConfig[]
+  localSLAConfigs   LocalSLAConfig[]
 
   @@map("tenants")
 }
@@ -41,6 +43,7 @@ model Local {
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   channels Channel[]
   threads  Thread[]
+  localSLAConfigs LocalSLAConfig[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -293,6 +296,8 @@ model SLA {
   businessHoursJSON  Json? // Business hours configuration
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channelSLAConfigs ChannelSLAConfig[]
+  localSLAConfigs   LocalSLAConfig[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -355,4 +360,43 @@ model Notification {
   @@index([userId])
   @@index([readAt])
   @@map("notifications")
+}
+
+// Channel SLA Configuration
+model ChannelSLAConfig {
+  id         String   @id @default(cuid())
+  tenantId   String
+  channelType String  // WHATSAPP, INSTAGRAM, TIKTOK, FACEBOOK, TWITTER, TELEGRAM
+  slaId      String?
+  
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sla        SLA?   @relation(fields: [slaId], references: [id], onDelete: SetNull)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, channelType])
+  @@index([tenantId])
+  @@index([channelType])
+  @@map("channel_sla_configs")
+}
+
+// Local SLA Configuration
+model LocalSLAConfig {
+  id       String   @id @default(cuid())
+  tenantId String
+  localId  String
+  slaId    String?
+  
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  local    Local  @relation(fields: [localId], references: [id], onDelete: Cascade)
+  sla      SLA?   @relation(fields: [slaId], references: [id], onDelete: SetNull)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, localId])
+  @@index([tenantId])
+  @@index([localId])
+  @@map("local_sla_configs")
 }
