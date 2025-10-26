@@ -6,10 +6,12 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Send, Paperclip, Smile, Zap, X, File, Image, Video, Music } from "lucide-react"
+import { Send, Paperclip, Smile, Zap, X, File, Image, Video, Music, FileText } from "lucide-react"
 import { sendMessage } from "@/app/actions/messages"
 import { useRouter } from "next/navigation"
 import { QuickRepliesPopover } from "@/components/inbox/quick-replies-popover"
+import { TemplateSelector } from "@/components/inbox/template-selector"
+import { TemplatePreview } from "@/components/templates/template-preview"
 import { toast } from "sonner"
 import { useStorage } from "@/hooks/use-storage"
 import { UploadProgress } from "@/components/ui/progress-bar"
@@ -44,9 +46,10 @@ interface MessageComposerProps {
   channelId: string
   tenantId: string
   userId: string
+  channelType?: string
 }
 
-export function MessageComposer({ threadId, channelId, tenantId, userId }: MessageComposerProps) {
+export function MessageComposer({ threadId, channelId, tenantId, userId, channelType = "whatsapp" }: MessageComposerProps) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { uploadFile, uploading: storageUploading, error: storageError, uploadProgress, clearProgress } = useStorage()
@@ -63,6 +66,20 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
   const [sending, setSending] = useState(false)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [uploading, setUploading] = useState(false)
+
+  // Función para manejar la selección de plantillas
+  const handleTemplateSelect = (template: any, variables: Record<string, string>) => {
+    let content = template.contentJSON?.text || template.contentJSON?.content || ""
+    
+    // Reemplazar variables con valores
+    Object.entries(variables).forEach(([variable, value]) => {
+      const placeholder = value || `[${variable}]`
+      content = content.replace(new RegExp(`\\{\\{${variable}\\}\\}`, 'g'), placeholder)
+    })
+    
+    setMessage(content)
+    toast.success("Plantilla aplicada")
+  }
 
   // Función para manejar la selección de archivos
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -466,48 +483,67 @@ export function MessageComposer({ threadId, channelId, tenantId, userId }: Messa
         </div>
       )}
 
-      <div className="flex gap-2">
-        <Textarea
-          placeholder="Escribe un mensaje..."
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="min-h-[60px] resize-none"
-          disabled={sending}
-        />
-        <div className="flex flex-col gap-2">
-          <QuickRepliesPopover
-            tenantId={tenantId}
-            onSelect={(content) => setMessage(content)}
-          >
-            <Button variant="ghost" size="icon" disabled={sending} title="Respuestas rápidas">
-              <Zap className="h-4 w-4" />
-            </Button>
-          </QuickRepliesPopover>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <Textarea
+            placeholder="Escribe un mensaje..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="min-h-[60px] resize-none"
             disabled={sending}
-            onClick={handleAttachClick}
-            title="Adjuntar archivos"
-          >
-            <Paperclip className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" disabled={sending} title="Emojis">
-            <Smile className="h-4 w-4" />
-          </Button>
-          <Button 
-            onClick={handleSend} 
-            disabled={(!message.trim() && attachments.length === 0) || sending || uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing || audioOptimizing}
-            title={uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing || audioOptimizing ? "Procesando..." : "Enviar mensaje"}
-          >
-            {uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing || audioOptimizing ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
+          />
+          <div className="flex flex-col gap-2">
+            <TemplateSelector
+              tenantId={tenantId}
+              channelType={channelType}
+              onSelect={handleTemplateSelect}
+            >
+              <Button variant="ghost" size="icon" disabled={sending} title="Plantillas">
+                <FileText className="h-4 w-4" />
+              </Button>
+            </TemplateSelector>
+            <QuickRepliesPopover
+              tenantId={tenantId}
+              onSelect={(content) => setMessage(content)}
+            >
+              <Button variant="ghost" size="icon" disabled={sending} title="Respuestas rápidas">
+                <Zap className="h-4 w-4" />
+              </Button>
+            </QuickRepliesPopover>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              disabled={sending}
+              onClick={handleAttachClick}
+              title="Adjuntar archivos"
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" disabled={sending} title="Emojis">
+              <Smile className="h-4 w-4" />
+            </Button>
+            <Button 
+              onClick={handleSend} 
+              disabled={(!message.trim() && attachments.length === 0) || sending || uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing || audioOptimizing}
+              title={uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing || audioOptimizing ? "Procesando..." : "Enviar mensaje"}
+            >
+              {uploading || storageUploading || imageOptimizing || videoOptimizing || documentOptimizing || audioOptimizing ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
+        
+        {/* Validador de plantillas */}
+        <TemplatePreview
+          templateText={message}
+          showVariables={false}
+          showValidation={true}
+          compact={true}
+        />
       </div>
     </div>
   )

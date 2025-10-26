@@ -4,12 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { requireAuth, checkTenantAccess } from "@/lib/auth-utils"
 import { revalidatePath } from "next/cache"
 import { getAdapter } from "@/lib/adapters"
-import { 
-  saveChannelCredentials,
-  getChannelCredentials,
-  validateStoredCredentials,
-  getExpiredCredentials
-} from "@/lib/channel-credentials"
+import { ChannelCredentialsService } from "@/lib/channel-credentials"
 import { ChannelCredentials } from "@/lib/types/channel-credentials"
 
 export async function getChannels(tenantId: string) {
@@ -347,7 +342,7 @@ export async function saveCredentials(data: {
   credentials: Partial<ChannelCredentials>
 }) {
   try {
-    const result = await saveChannelCredentials(data)
+    const result = await ChannelCredentialsService.saveChannelCredentials(data)
     
     if (result.success) {
       revalidatePath(`/app/${data.tenantId}/channels`)
@@ -366,7 +361,7 @@ export async function getCredentials(data: {
   tenantId: string
 }) {
   try {
-    return await getChannelCredentials(data)
+    return await ChannelCredentialsService.getChannelCredentials(data.channelId)
   } catch (error) {
     console.error("[Get Credentials Action] Error:", error)
     return { error: "Error al obtener credenciales" }
@@ -379,7 +374,7 @@ export async function validateStoredChannelCredentials(data: {
   tenantId: string
 }) {
   try {
-    const result = await validateStoredCredentials(data)
+    const result = await ChannelCredentialsService.validateStoredCredentials(data)
     
     if (result.success) {
       revalidatePath(`/app/${data.tenantId}/channels`)
@@ -395,7 +390,7 @@ export async function validateStoredChannelCredentials(data: {
 // Obtener canales con credenciales expiradas
 export async function getChannelsWithExpiredCredentials(tenantId: string) {
   try {
-    return await getExpiredCredentials(tenantId)
+    return await ChannelCredentialsService.getExpiredCredentials(tenantId)
   } catch (error) {
     console.error("[Get Expired Credentials Action] Error:", error)
     return { error: "Error al obtener credenciales expiradas" }

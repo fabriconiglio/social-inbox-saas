@@ -35,7 +35,13 @@ export function ThreadView({ thread, tenantId, userId, userRole, members }: Thre
       <div className="flex flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col">
           <MessageList threadId={thread.id} tenantId={tenantId} />
-          <MessageComposer threadId={thread.id} channelId={thread.channelId} tenantId={tenantId} userId={userId} />
+          <MessageComposer 
+            threadId={thread.id} 
+            channelId={thread.channelId} 
+            tenantId={tenantId} 
+            userId={userId}
+            channelType={thread.channel?.type || "whatsapp"}
+          />
         </div>
 
         {showSidebar && (
