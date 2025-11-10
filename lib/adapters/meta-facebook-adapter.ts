@@ -17,6 +17,7 @@ import {
 import { verifyMetaWebhook } from "@/lib/webhook-verification"
 import { MediaMappingService } from "@/lib/media-mapping"
 import { ChannelCredentialsService } from "@/lib/channel-credentials"
+import axios from "axios"
 
 export class MetaFacebookAdapter implements ChannelAdapter {
   type = "facebook"
@@ -104,6 +105,15 @@ export class MetaFacebookAdapter implements ChannelAdapter {
     try {
       const { pageId, accessToken } = credentials
 
+      console.log("[Facebook] Enviando mensaje:", {
+        channelId,
+        pageId,
+        hasAccessToken: !!accessToken,
+        accessTokenLength: accessToken?.length,
+        threadExternalId: message.threadExternalId,
+        messageLength: message.body.length
+      })
+
       // Validar que existan las credenciales necesarias
       if (!pageId || !accessToken) {
         const error = createAdapterError(
@@ -190,47 +200,78 @@ export class MetaFacebookAdapter implements ChannelAdapter {
         }
       }
 
-      // Enviar mensaje usando Facebook Messenger API
-      const response = await fetch(
-        `https://graph.facebook.com/v18.0/${pageId}/messages`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(messagePayload),
-        }
-      )
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const adapterError = analyzeMetaError(errorData, "Facebook", "sendMessage")
-        logAdapterError("Facebook", "sendMessage", adapterError, channelId, {
-          statusCode: response.status,
-          threadExternalId: message.threadExternalId,
-          messageLength: message.body.length
-        })
-        return { success: false, error: adapterError }
-      }
-
-      const data = await response.json()
-      
-      if (!data.message_id) {
-        const error = createAdapterError(
-          ErrorType.API,
-          "Facebook no devolvió un ID de mensaje válido",
-          { 
-            originalError: data,
-            details: { channelId, response: data }
+      // Enviar mensaje usando Facebook Messenger API con axios
+      try {
+        const response = await axios.post(
+          `https://graph.facebook.com/v18.0/${pageId}/messages`,
+          messagePayload,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "User-Agent": "MessageHub/1.0",
+            },
+            timeout: 30000, // 30 segundos timeout
+            validateStatus: (status) => status < 500, // No lanzar error para códigos 4xx
           }
         )
-        logAdapterError("Facebook", "sendMessage", error, channelId)
-        return { success: false, error }
-      }
 
-      return { 
-        success: true, 
-        data: { externalId: data.message_id }
+        if (response.status >= 400) {
+          const errorData = response.data || {}
+          const adapterError = analyzeMetaError(errorData, "Facebook", "sendMessage")
+          logAdapterError("Facebook", "sendMessage", adapterError, channelId, {
+            statusCode: response.status,
+            threadExternalId: message.threadExternalId,
+            messageLength: message.body.length
+          })
+          return { success: false, error: adapterError }
+        }
+
+        const data = response.data
+        
+        if (!data.message_id) {
+          const error = createAdapterError(
+            ErrorType.API,
+            "Facebook no devolvió un ID de mensaje válido",
+            { 
+              originalError: data,
+              details: { channelId, response: data }
+            }
+          )
+          logAdapterError("Facebook", "sendMessage", error, channelId)
+          return { success: false, error }
+        }
+
+        console.log(`[Facebook] Mensaje enviado exitosamente: ${data.message_id}`)
+        return { 
+          success: true, 
+          data: { externalId: data.message_id }
+        }
+      } catch (axiosError: any) {
+        // Manejar errores de axios
+        if (axiosError.code === 'ECONNABORTED' || axiosError.message?.includes('timeout')) {
+          const timeoutError = createAdapterError(
+            ErrorType.NETWORK,
+            "Timeout: La API de Facebook tardó demasiado en responder",
+            { details: { channelId, timeout: 30000 } }
+          )
+          logAdapterError("Facebook", "sendMessage", timeoutError, channelId)
+          return { success: false, error: timeoutError }
+        }
+        
+        if (axiosError.response) {
+          // Error de respuesta HTTP
+          const errorData = axiosError.response.data || {}
+          const adapterError = analyzeMetaError(errorData, "Facebook", "sendMessage")
+          logAdapterError("Facebook", "sendMessage", adapterError, channelId, {
+            statusCode: axiosError.response.status,
+            threadExternalId: message.threadExternalId,
+            messageLength: message.body.length
+          })
+          return { success: false, error: adapterError }
+        }
+        
+        // Error de red u otro error
+        throw axiosError // Re-throw para que lo maneje el catch exterior
       }
     } catch (error) {
       const adapterError = analyzeApiError(error, "Facebook", "sendMessage")
@@ -340,63 +381,89 @@ export class MetaFacebookAdapter implements ChannelAdapter {
       }
 
       // Verificar que el Page ID sea válido
-      const response = await fetch(
-        `https://graph.facebook.com/v18.0/${pageId}?fields=id,name,category`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      )
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 segundos timeout
+      
+      try {
+        const response = await fetch(
+          `https://graph.facebook.com/v18.0/${pageId}?fields=id,name,category`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+            signal: controller.signal,
+          }
+        )
+        clearTimeout(timeoutId)
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.error?.message || `Error ${response.status}: ${response.statusText}`
-        
-        return {
-          valid: false,
-          error: `Credenciales inválidas: ${errorMessage}`,
-        }
-      }
-
-      const data = await response.json()
-
-      // Verificar permisos del token
-      const permissionsResponse = await fetch(
-        `https://graph.facebook.com/v18.0/me/permissions`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      )
-
-      if (permissionsResponse.ok) {
-        const permissionsData = await permissionsResponse.json()
-        const requiredPermissions = ['pages_messaging', 'pages_manage_metadata']
-        const grantedPermissions = permissionsData.data
-          ?.filter((p: any) => p.status === 'granted')
-          ?.map((p: any) => p.permission) || []
-
-        const missingPermissions = requiredPermissions.filter(p => !grantedPermissions.includes(p))
-        
-        if (missingPermissions.length > 0) {
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.error?.message || `Error ${response.status}: ${response.statusText}`
+          
           return {
             valid: false,
-            error: `Faltan permisos: ${missingPermissions.join(', ')}`,
+            error: `Credenciales inválidas: ${errorMessage}`,
           }
         }
-      }
 
-      return {
-        valid: true,
-        details: {
-          pageName: data.name,
-          pageId: data.id,
-          category: data.category,
-        },
+        const data = await response.json()
+
+        // Verificar permisos del token (opcional, no bloquea si falla)
+        let permissionsWarning: string | undefined
+        try {
+          const permController = new AbortController()
+          const permTimeoutId = setTimeout(() => permController.abort(), 5000) // 5 segundos timeout más corto
+          
+          const permissionsResponse = await fetch(
+            `https://graph.facebook.com/v18.0/me/permissions`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+              signal: permController.signal,
+            }
+          )
+          clearTimeout(permTimeoutId)
+
+          if (permissionsResponse.ok) {
+            const permissionsData = await permissionsResponse.json()
+            const requiredPermissions = ['pages_messaging', 'pages_manage_metadata']
+            const grantedPermissions = permissionsData.data
+              ?.filter((p: any) => p.status === 'granted')
+              ?.map((p: any) => p.permission) || []
+
+            const missingPermissions = requiredPermissions.filter(p => !grantedPermissions.includes(p))
+            
+            if (missingPermissions.length > 0) {
+              permissionsWarning = `Algunos permisos pueden estar faltando: ${missingPermissions.join(', ')}`
+            }
+          }
+        } catch (permError: any) {
+          // No bloquear por errores de verificación de permisos
+          console.warn("[Facebook] Error verificando permisos (no bloqueante):", permError.message)
+          permissionsWarning = "No se pudieron verificar los permisos, pero las credenciales son válidas"
+        }
+
+        return {
+          valid: true,
+          details: {
+            pageName: data.name,
+            pageId: data.id,
+            category: data.category,
+            ...(permissionsWarning && { warning: permissionsWarning }),
+          },
+        }
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+        if (fetchError.name === 'AbortError') {
+          return {
+            valid: false,
+            error: "Timeout: La API de Facebook tardó demasiado en responder",
+          }
+        }
+        throw fetchError // Re-throw para que lo maneje el catch exterior
       }
     } catch (error) {
       console.error("[Facebook] Error validando credenciales:", error)

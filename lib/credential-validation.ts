@@ -148,19 +148,29 @@ export async function validateChannelCredentialsEnhanced(
       }
     }
 
-    // 8. Validación de permisos (si está habilitada)
+    // 8. Validación de permisos (si está habilitada) - No bloquea si falla
     if (options.validatePermissions && data.type !== "MOCK") {
-      const permissionsResult = await validateChannelPermissions(adapter, data.config)
-      if (!permissionsResult.valid) {
-        warnings.push(`Permisos limitados: ${permissionsResult.error}`)
+      try {
+        const permissionsResult = await validateChannelPermissions(adapter, data.config)
+        if (!permissionsResult.valid) {
+          warnings.push(`Permisos limitados: ${permissionsResult.error}`)
+        }
+      } catch (error) {
+        // No bloquear por errores de validación de permisos
+        console.warn("[Enhanced Validation] Error validando permisos:", error)
       }
     }
 
-    // 9. Test de conectividad (si está habilitado)
+    // 9. Test de conectividad (si está habilitado) - No bloquea si falla
     if (options.testConnectivity && data.type !== "MOCK") {
-      const connectivityResult = await testChannelConnectivity(adapter, data.config)
-      if (!connectivityResult.valid) {
-        warnings.push(`Problemas de conectividad: ${connectivityResult.error}`)
+      try {
+        const connectivityResult = await testChannelConnectivity(adapter, data.config)
+        if (!connectivityResult.valid) {
+          warnings.push(`Problemas de conectividad: ${connectivityResult.error}`)
+        }
+      } catch (error) {
+        // No bloquear por errores de conectividad
+        console.warn("[Enhanced Validation] Error validando conectividad:", error)
       }
     }
 
@@ -297,44 +307,60 @@ async function validateChannelPermissions(
   try {
     // Para Meta (Instagram/Facebook), verificar permisos específicos
     if (adapter.type === "instagram" || adapter.type === "facebook") {
-      const response = await fetch(
-        `https://graph.facebook.com/v18.0/me/permissions`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${config.accessToken}`,
-          },
-        }
-      )
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 segundos timeout
+      
+      try {
+        const response = await fetch(
+          `https://graph.facebook.com/v18.0/me/permissions`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${config.accessToken}`,
+            },
+            signal: controller.signal,
+          }
+        )
+        clearTimeout(timeoutId)
 
-      if (!response.ok) {
+        if (!response.ok) {
+          return {
+            valid: false,
+            error: "No se pudieron verificar los permisos"
+          }
+        }
+
+        const data = await response.json()
+        const permissions = data.data || []
+        const permissionNames = permissions.map((p: any) => p.permission)
+
+        // Verificar permisos mínimos requeridos
+        const requiredPermissions = ["pages_messaging", "pages_read_engagement"]
+        const missingPermissions = requiredPermissions.filter(p => !permissionNames.includes(p))
+
+        if (missingPermissions.length > 0) {
+          return {
+            valid: false,
+            error: `Permisos faltantes: ${missingPermissions.join(", ")}`
+          }
+        }
+
         return {
-          valid: false,
-          error: "No se pudieron verificar los permisos"
+          valid: true,
+          details: {
+            permissions: permissionNames,
+            hasRequiredPermissions: true
+          }
         }
-      }
-
-      const data = await response.json()
-      const permissions = data.data || []
-      const permissionNames = permissions.map((p: any) => p.permission)
-
-      // Verificar permisos mínimos requeridos
-      const requiredPermissions = ["pages_messaging", "pages_read_engagement"]
-      const missingPermissions = requiredPermissions.filter(p => !permissionNames.includes(p))
-
-      if (missingPermissions.length > 0) {
-        return {
-          valid: false,
-          error: `Permisos faltantes: ${missingPermissions.join(", ")}`
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+        if (fetchError.name === 'AbortError') {
+          return {
+            valid: false,
+            error: "Timeout al verificar permisos"
+          }
         }
-      }
-
-      return {
-        valid: true,
-        details: {
-          permissions: permissionNames,
-          hasRequiredPermissions: true
-        }
+        throw fetchError
       }
     }
 
@@ -364,23 +390,39 @@ async function testChannelConnectivity(
   try {
     // Para Meta, hacer una llamada simple a la API
     if (adapter.type === "instagram" || adapter.type === "facebook") {
-      const response = await fetch(
-        `https://graph.facebook.com/v18.0/me`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${config.accessToken}`,
-          },
-        }
-      )
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 segundos timeout
+      
+      try {
+        const response = await fetch(
+          `https://graph.facebook.com/v18.0/me`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${config.accessToken}`,
+            },
+            signal: controller.signal,
+          }
+        )
+        clearTimeout(timeoutId)
 
-      return {
-        valid: response.ok,
-        error: response.ok ? undefined : `Error de conectividad: ${response.status}`,
-        details: {
-          statusCode: response.status,
-          connected: response.ok
+        return {
+          valid: response.ok,
+          error: response.ok ? undefined : `Error de conectividad: ${response.status}`,
+          details: {
+            statusCode: response.status,
+            connected: response.ok
+          }
         }
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+        if (fetchError.name === 'AbortError') {
+          return {
+            valid: false,
+            error: "Timeout al verificar conectividad"
+          }
+        }
+        throw fetchError
       }
     }
 

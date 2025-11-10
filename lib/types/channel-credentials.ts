@@ -126,7 +126,7 @@ export function createChannelCredentials(
     case 'FACEBOOK':
       return {
         ...baseCredentials,
-        pageAccessToken: credentialsData.pageAccessToken || '',
+        pageAccessToken: credentialsData.pageAccessToken || credentialsData.accessToken || '',
         pageId: credentialsData.pageId || '',
         appId: credentialsData.appId,
         permissions: credentialsData.permissions,

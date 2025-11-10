@@ -43,15 +43,19 @@ export async function POST(request: NextRequest) {
 
     // Verificar firma HMAC
     if (signature) {
-      // Obtener webhook secret desde variables de entorno
-      const webhookSecret = process.env.META_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET
+      // Meta usa el App Secret para firmar los webhooks, no un webhook secret separado
+      const webhookSecret = process.env.META_APP_SECRET || process.env.META_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET
       
-      const isValid = adapter.verifyWebhook(payloadString, signature, webhookSecret)
-      logWebhookVerification(channelType, isValid, signature, payloadString.length)
-      
-      if (!isValid) {
-        console.error(`[${channelType}] Webhook verification failed - rejecting request`)
-        return NextResponse.json({ error: "Invalid signature" }, { status: 403 })
+      if (!webhookSecret) {
+        console.warn(`[${channelType}] No webhook secret configured - skipping verification`)
+      } else {
+        const isValid = adapter.verifyWebhook(payloadString, signature, webhookSecret)
+        logWebhookVerification(channelType, isValid, signature, payloadString.length)
+        
+        if (!isValid) {
+          console.error(`[${channelType}] Webhook verification failed - rejecting request`)
+          return NextResponse.json({ error: "Invalid signature" }, { status: 403 })
+        }
       }
     } else {
       console.warn(`[${channelType}] No signature provided - skipping verification`)

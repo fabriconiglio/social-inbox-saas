@@ -1,4 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/auth-utils"
+import { checkTenantAccess } from "@/lib/auth-utils"
+import { prisma } from "@/lib/prisma"
 
 export async function GET(
   request: NextRequest,
@@ -7,12 +10,6 @@ export async function GET(
   try {
     const { tenantId, threadId } = await params
 
-    const { getMockMessagesByThreadId } = await import("@/lib/mock-data")
-    const messages = getMockMessagesByThreadId(threadId)
-    return NextResponse.json(messages)
-
-    // Original database code (commented for preview)
-    /*
     const user = await requireAuth()
 
     const membership = await checkTenantAccess(user.id!, tenantId)
@@ -43,7 +40,6 @@ export async function GET(
     })
 
     return NextResponse.json(messages)
-    */
   } catch (error) {
     console.error("[Messages API] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

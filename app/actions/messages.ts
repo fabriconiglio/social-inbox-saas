@@ -5,6 +5,9 @@ import { requireAuth, checkTenantAccess } from "@/lib/auth-utils"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { emitNewMessage, emitMessageRead } from "@/lib/socket-events"
+import { getAdapter } from "@/lib/adapters"
+import { ChannelCredentialsService } from "@/lib/channel-credentials"
+import { messageQueue } from "@/lib/queue"
 
 const sendMessageSchema = z.object({
   threadId: z.string(),
@@ -49,11 +52,10 @@ export async function sendMessage(data: z.infer<typeof sendMessageSchema>) {
     const message = await prisma.message.create({
       data: {
         threadId: data.threadId,
-        content: data.content,
+        body: data.content,
         channelId: data.channelId,
-        senderId: user.id!,
-        senderType: "AGENT",
-        messageType: data.messageType,
+        direction: "OUTBOUND",
+        authorId: user.id!,
         attachments: data.attachments || [],
         sentAt: new Date(),
         deliveredAt: new Date() // Simulamos que se entregó inmediatamente
@@ -65,7 +67,6 @@ export async function sendMessage(data: z.infer<typeof sendMessageSchema>) {
       where: { id: data.threadId },
       data: {
         lastMessageAt: new Date(),
-        lastMessageId: message.id
       }
     })
 
@@ -80,18 +81,74 @@ export async function sendMessage(data: z.infer<typeof sendMessageSchema>) {
       select: { name: true, handle: true }
     })
 
-    // Emitir evento de nuevo mensaje
-    emitNewMessage({
-      threadId: data.threadId,
-      messageId: message.id,
-      content: data.content,
-      sender: user.id!,
-      senderName: user.name || user.email || 'Agente',
-      timestamp: message.sentAt.toISOString(),
-      channelType: channel?.type || 'unknown',
-      channelId: data.channelId,
-      tenantId: data.tenantId
-    })
+    // Enviar mensaje a través del adapter del canal (de forma asíncrona usando cola)
+    if (channel && channel.type !== "MOCK") {
+      try {
+        // Preparar el mensaje para el adapter
+        const sendMessageDTO = {
+          body: data.content,
+          threadExternalId: thread.externalId,
+          attachments: data.attachments?.map(att => ({
+            type: att.type,
+            url: att.url,
+            mimeType: undefined,
+          })) || [],
+        }
+
+        // Encolar el mensaje para procesamiento asíncrono
+        // Esto evita timeouts y mejora la experiencia del usuario
+        await messageQueue.add(
+          "send-message",
+          {
+            channelId: data.channelId,
+            messageId: message.id,
+            message: sendMessageDTO,
+          },
+          {
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 2000,
+            },
+            removeOnComplete: true,
+            removeOnFail: false,
+          }
+        )
+
+        console.log(`[Send Message] Mensaje ${message.id} encolado para envío asíncrono`)
+        
+        // No esperar la respuesta, el worker procesará el mensaje en background
+        // El mensaje se actualizará automáticamente cuando el worker lo procese
+      } catch (error) {
+        console.error("[Send Message] Error encolando mensaje:", error)
+        // Si falla al encolar, marcar como error
+        await prisma.message.update({
+          where: { id: message.id },
+          data: {
+            failedReason: error instanceof Error ? error.message : "Error al encolar mensaje",
+          },
+        })
+        return { success: false, error: error instanceof Error ? error.message : "Error al enviar mensaje" }
+      }
+    }
+
+    // Emitir evento de nuevo mensaje (no bloquea si falla)
+    try {
+      emitNewMessage({
+        threadId: data.threadId,
+        messageId: message.id,
+        content: message.body,
+        sender: user.id!,
+        senderName: user.name || user.email || 'Agente',
+        timestamp: message.sentAt.toISOString(),
+        channelType: channel?.type || 'unknown',
+        channelId: data.channelId,
+        tenantId: data.tenantId
+      })
+    } catch (socketError) {
+      // No bloquear el envío si falla el socket
+      console.warn("[Send Message] Error emitiendo evento socket (no bloqueante):", socketError)
+    }
 
     revalidatePath(`/app/${data.tenantId}/inbox`)
     return { success: true, messageId: message.id }
@@ -137,7 +194,6 @@ export async function markMessageAsRead(data: z.infer<typeof markMessageReadSche
       where: { id: data.messageId },
       data: {
         readAt: new Date(),
-        readBy: user.id!
       }
     })
 

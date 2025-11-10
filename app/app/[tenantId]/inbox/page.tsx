@@ -1,5 +1,8 @@
 import { InboxLayout } from "@/components/inbox/inbox-layout"
 import type { Metadata } from "next"
+import { requireAuth } from "@/lib/auth-utils"
+import { requireTenantAccess } from "@/lib/auth-utils"
+import { prisma } from "@/lib/prisma"
 
 export const metadata: Metadata = {
   title: "Bandeja de Entrada | MessageHub",
@@ -20,22 +23,6 @@ export default async function InboxPage({ params, searchParams }: InboxPageProps
   const { tenantId } = await params
   const filters = await searchParams
 
-  const { mockUser, mockLocals, mockMembers, mockThreads } = await import("@/lib/mock-data")
-
-  return (
-    <InboxLayout
-      tenantId={tenantId}
-      userId={mockUser.id}
-      userRole={mockUser.role}
-      locals={mockLocals as any}
-      members={mockMembers as any}
-      threads={mockThreads as any}
-      filters={filters}
-    />
-  )
-
-  // Original database code (commented for preview)
-  /*
   const user = await requireAuth()
   const membership = await requireTenantAccess(user.id!, tenantId)
 
@@ -127,5 +114,4 @@ export default async function InboxPage({ params, searchParams }: InboxPageProps
       filters={filters}
     />
   )
-  */
 }

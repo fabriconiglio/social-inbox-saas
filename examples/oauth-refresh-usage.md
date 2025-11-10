@@ -182,8 +182,8 @@ const tiktokRefresh = {
 
 ```bash
 # Meta (Instagram/Facebook/WhatsApp)
-META_APP_ID=your_app_id
-META_APP_SECRET=your_app_secret
+META_APP_ID=1137302091229055
+META_APP_SECRET=8d9fa56713f7b9902f513f7560936a00
 
 # TikTok
 TIKTOK_CLIENT_KEY=your_client_key

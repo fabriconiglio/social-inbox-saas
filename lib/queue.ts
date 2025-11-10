@@ -28,6 +28,7 @@ export const messageWorker = new Worker<SendMessageJob>(
     try {
       const channel = await prisma.channel.findUnique({
         where: { id: channelId },
+        include: { local: true },
       })
 
       if (!channel) {
@@ -39,19 +40,71 @@ export const messageWorker = new Worker<SendMessageJob>(
         throw new Error("Adapter not found")
       }
 
-      // Obtener credenciales desde channel.meta
-      const credentials = (channel.meta as Record<string, any>) || {}
+      // Obtener credenciales desencriptadas
+      let adapterCredentials: Record<string, any> = {}
+      
+      if (channel.type === "FACEBOOK" || channel.type === "INSTAGRAM") {
+        const meta = channel.meta as any
+        // Intentar obtener credenciales desencriptadas primero
+        try {
+          const { getDecryptedChannelCredentials } = await import("@/lib/encrypted-credentials")
+          const credentialsResult = await getDecryptedChannelCredentials({
+            channelId,
+            tenantId: channel.local.tenantId,
+          })
+          
+          if (credentialsResult.success && credentialsResult.credentials) {
+            const metaCreds = credentialsResult.credentials as any
+            adapterCredentials = {
+              pageId: metaCreds.pageId || meta?.pageId,
+              accessToken: metaCreds.pageAccessToken || metaCreds.accessToken || meta?.accessToken,
+            }
+          } else {
+            // Fallback: usar credenciales directamente de meta
+            adapterCredentials = {
+              pageId: meta?.pageId || meta?.credentials?.pageId,
+              accessToken: meta?.accessToken || meta?.credentials?.pageAccessToken || meta?.credentials?.accessToken,
+            }
+          }
+        } catch (error) {
+          // Si falla la desencriptación, usar credenciales directamente de meta
+          const meta = channel.meta as any
+          adapterCredentials = {
+            pageId: meta?.pageId || meta?.credentials?.pageId,
+            accessToken: meta?.accessToken || meta?.credentials?.pageAccessToken || meta?.credentials?.accessToken,
+          }
+        }
+      } else if (channel.type === "WHATSAPP") {
+        const meta = channel.meta as any
+        adapterCredentials = {
+          phoneId: meta?.phoneId || meta?.credentials?.phoneNumberId,
+          accessToken: meta?.accessToken || meta?.credentials?.accessToken,
+          businessId: meta?.businessId || meta?.credentials?.businessAccountId,
+        }
+      } else if (channel.type === "TIKTOK") {
+        const meta = channel.meta as any
+        adapterCredentials = {
+          accessToken: meta?.accessToken || meta?.credentials?.accessToken,
+          appId: meta?.appId || meta?.credentials?.appId,
+          appSecret: meta?.appSecret || meta?.credentials?.appSecret,
+        }
+      }
 
-      const result = await adapter.sendMessage(channelId, message, credentials)
+      console.log(`[Queue] Procesando mensaje ${messageId} para canal ${channelId} (${channel.type})`)
+
+      const result = await adapter.sendMessage(channelId, message, adapterCredentials)
 
       if (result.success && result.data) {
+        console.log(`[Queue] Mensaje ${messageId} enviado exitosamente, actualizando con externalId: ${result.data.externalId}`)
         await prisma.message.update({
           where: { id: messageId },
           data: {
             externalId: result.data.externalId,
             deliveredAt: new Date(),
+            failedReason: null, // Limpiar cualquier error anterior
           },
         })
+        console.log(`[Queue] Mensaje ${messageId} actualizado exitosamente`)
       } else {
         // Extraer información del error para logging
         const errorMessage = result.error?.message || "Error desconocido"

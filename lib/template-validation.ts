@@ -425,3 +425,11 @@ export function suggestTemplateImprovements(templateText: string): string[] {
 
   return suggestions
 }
+
+
+
+
+
+
+
+

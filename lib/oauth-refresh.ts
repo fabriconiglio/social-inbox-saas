@@ -26,7 +26,6 @@ import {
 } from "./types/channel-credentials"
 import { prisma } from "./prisma"
 import { Prisma } from "@prisma/client"
-import { getChannelCredentials } from "./channel-credentials"
 import { getDecryptedChannelCredentials } from "./encrypted-credentials"
 import { env } from "./env"
 

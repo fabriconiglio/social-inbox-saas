@@ -278,3 +278,11 @@ export function SyncStatus({ tenantId, channelType, onSync, onConfigure }: SyncS
     </Card>
   )
 }
+
+
+
+
+
+
+
+
