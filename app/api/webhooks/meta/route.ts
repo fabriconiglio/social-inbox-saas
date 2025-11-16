@@ -30,11 +30,15 @@ export async function POST(request: NextRequest) {
     const payloadString = await getPayloadAsString(request)
     const payload = JSON.parse(payloadString)
 
+    console.log("[Meta Webhook] Received payload:", JSON.stringify(payload, null, 2))
+
     // Extraer firma del header
     const signature = extractSignatureFromHeaders(request.headers)
     
     // Determine if it's Instagram or Facebook based on payload.object
     const channelType = payload.object === "instagram" ? "instagram" : "facebook"
+    console.log(`[Meta Webhook] Detected channel type: ${channelType} (payload.object: ${payload.object})`)
+    
     const adapter = getAdapter(channelType)
 
     if (!adapter) {
@@ -49,12 +53,28 @@ export async function POST(request: NextRequest) {
       if (!webhookSecret) {
         console.warn(`[${channelType}] No webhook secret configured - skipping verification`)
       } else {
+        console.log(`[${channelType}] Verifying webhook signature...`, {
+          hasSecret: !!webhookSecret,
+          secretLength: webhookSecret?.length,
+          signature: signature.substring(0, 20) + "...",
+          payloadLength: payloadString.length
+        })
+        
         const isValid = adapter.verifyWebhook(payloadString, signature, webhookSecret)
         logWebhookVerification(channelType, isValid, signature, payloadString.length)
         
         if (!isValid) {
-          console.error(`[${channelType}] Webhook verification failed - rejecting request`)
-          return NextResponse.json({ error: "Invalid signature" }, { status: 403 })
+          console.error(`[${channelType}] Webhook verification failed - rejecting request`, {
+            signature: signature.substring(0, 50),
+            payloadPreview: payloadString.substring(0, 200),
+            hasSecret: !!webhookSecret
+          })
+          // Temporalmente permitir webhooks sin verificación en desarrollo para debugging
+          if (process.env.NODE_ENV === "development") {
+            console.warn(`[${channelType}] ⚠️ DEVELOPMENT MODE: Allowing webhook despite failed verification`)
+          } else {
+            return NextResponse.json({ error: "Invalid signature" }, { status: 403 })
+          }
         }
       }
     } else {
@@ -77,8 +97,18 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    console.log(`[Meta Webhook] Found ${channels.length} active ${channelType} channels`)
+
+    if (channels.length === 0) {
+      console.warn(`[Meta Webhook] No active ${channelType} channels found in database`)
+      return NextResponse.json({ success: true, message: "No active channels found" })
+    }
+
     for (const channel of channels) {
+      console.log(`[Meta Webhook] Processing webhook for channel ${channel.id} (${channel.displayName})`)
       const messageDTO = await adapter.ingestWebhook(payload, channel.id)
+      
+      console.log(`[Meta Webhook] ingestWebhook result:`, messageDTO ? "Message found" : "No message")
 
       if (messageDTO) {
         // Find or create contact

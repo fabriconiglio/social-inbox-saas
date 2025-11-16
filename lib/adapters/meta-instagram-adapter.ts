@@ -17,6 +17,7 @@ import {
 import { verifyMetaWebhook } from "@/lib/webhook-verification"
 import { MediaMappingService } from "@/lib/media-mapping"
 import { ChannelCredentialsService } from "@/lib/channel-credentials"
+import axios from "axios"
 
 export class MetaInstagramAdapter implements ChannelAdapter {
   type = "instagram"
@@ -43,17 +44,62 @@ export class MetaInstagramAdapter implements ChannelAdapter {
 
   async ingestWebhook(payload: any, channelId: string): Promise<MessageDTO | null> {
     try {
+      console.log("[Instagram] Processing webhook payload:", JSON.stringify(payload, null, 2))
+      
       // Meta webhook structure for Instagram messages
-      if (payload.object !== "instagram") return null
+      if (payload.object !== "instagram") {
+        console.log(`[Instagram] Payload object is '${payload.object}', expected 'instagram'`)
+        return null
+      }
 
       const entry = payload.entry?.[0]
-      if (!entry) return null
+      if (!entry) {
+        console.log("[Instagram] No entry found in payload")
+        return null
+      }
+
+      console.log("[Instagram] Entry found:", JSON.stringify(entry, null, 2))
 
       const messaging = entry.messaging?.[0]
-      if (!messaging) return null
+      if (!messaging) {
+        console.log("[Instagram] No messaging found in entry")
+        return null
+      }
 
+      console.log("[Instagram] Messaging object keys:", Object.keys(messaging))
+      console.log("[Instagram] Full messaging object:", JSON.stringify(messaging, null, 2))
+
+      // Instagram puede enviar diferentes tipos de eventos:
+      // - message: mensaje nuevo
+      // - message_edit: edición de mensaje
+      // - message_reaction: reacción a mensaje
+      // - read: marcado como leído
+      // Por ahora solo procesamos mensajes nuevos
       const message = messaging.message
-      if (!message) return null
+      if (!message) {
+        // Verificar qué tipo de evento es
+        if (messaging.message_edit) {
+          console.log("[Instagram] Received message_edit event (not processing)")
+          return null
+        }
+        if (messaging.message_reaction) {
+          console.log("[Instagram] Received message_reaction event (not processing)")
+          return null
+        }
+        if (messaging.read) {
+          console.log("[Instagram] Received read event (not processing)")
+          return null
+        }
+        if (messaging.delivery) {
+          console.log("[Instagram] Received delivery event (not processing)")
+          return null
+        }
+        console.log("[Instagram] No message found in messaging and no recognized event type")
+        console.log("[Instagram] Available keys in messaging:", Object.keys(messaging))
+        return null
+      }
+
+      console.log("[Instagram] Message found:", JSON.stringify(message, null, 2))
 
       const attachments: Attachment[] = []
 
@@ -107,6 +153,15 @@ export class MetaInstagramAdapter implements ChannelAdapter {
   ): Promise<AdapterResult<{ externalId: string }>> {
     try {
       const { pageId, accessToken } = credentials
+
+      console.log("[Instagram] Enviando mensaje:", {
+        channelId,
+        pageId,
+        hasAccessToken: !!accessToken,
+        accessTokenLength: accessToken?.length,
+        threadExternalId: message.threadExternalId,
+        messageLength: message.body.length
+      })
 
       // Validar que existan las credenciales necesarias
       if (!pageId || !accessToken) {
@@ -194,47 +249,132 @@ export class MetaInstagramAdapter implements ChannelAdapter {
         }
       }
 
-      // Enviar mensaje usando Instagram Messenger API
-      const response = await fetch(
-        `https://graph.facebook.com/v18.0/${pageId}/messages`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(messagePayload),
-        }
-      )
+      console.log("[Instagram] Payload a enviar:", JSON.stringify(messagePayload, null, 2))
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const adapterError = analyzeMetaError(errorData, "Instagram", "sendMessage")
-        logAdapterError("Instagram", "sendMessage", adapterError, channelId, {
-          statusCode: response.status,
-          threadExternalId: message.threadExternalId,
-          messageLength: message.body.length
-        })
-        return { success: false, error: adapterError }
-      }
-
-      const data = await response.json()
-      
-      if (!data.message_id) {
-        const error = createAdapterError(
-          ErrorType.API,
-          "Instagram no devolvió un ID de mensaje válido",
-          { 
-            originalError: data,
-            details: { channelId, response: data }
+      // Enviar mensaje usando Instagram Messenger API con axios
+      try {
+        const response = await axios.post(
+          `https://graph.facebook.com/v18.0/${pageId}/messages`,
+          messagePayload,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "User-Agent": "MessageHub/1.0",
+            },
+            timeout: 30000, // 30 segundos timeout
+            validateStatus: (status) => status < 500, // No lanzar error para códigos 4xx
           }
         )
-        logAdapterError("Instagram", "sendMessage", error, channelId)
-        return { success: false, error }
-      }
 
-      return { 
-        success: true, 
-        data: { externalId: data.message_id }
+        if (response.status >= 400) {
+          const errorData = response.data || {}
+          console.error("[Instagram] Error de API:", {
+            status: response.status,
+            error: errorData,
+            pageId,
+            threadExternalId: message.threadExternalId
+          })
+          
+          const adapterError = analyzeMetaError(errorData, "Instagram", "sendMessage")
+          logAdapterError("Instagram", "sendMessage", adapterError, channelId, {
+            statusCode: response.status,
+            threadExternalId: message.threadExternalId,
+            messageLength: message.body.length,
+            errorData
+          })
+          return { success: false, error: adapterError }
+        }
+
+        const data = response.data
+
+        console.log("[Instagram] Respuesta completa de API:", JSON.stringify(data, null, 2))
+        console.log("[Instagram] Status code:", response.status)
+        console.log("[Instagram] Headers:", JSON.stringify(response.headers, null, 2))
+
+        // Instagram puede devolver el message_id en diferentes formatos
+        // Intentar diferentes campos posibles
+        const messageId = data.message_id || data.id || data.mid || data.messageId
+
+        if (!messageId) {
+          // Si no hay message_id pero la respuesta fue exitosa (200), puede ser un problema de formato
+          // o que Instagram aceptó el mensaje pero no devolvió el ID
+          console.warn("[Instagram] Respuesta exitosa pero sin message_id:", {
+            responseData: data,
+            status: response.status,
+            hasMessageId: !!data.message_id,
+            hasId: !!data.id,
+            hasMid: !!data.mid,
+            allKeys: Object.keys(data)
+          })
+
+          // Si la respuesta es exitosa pero no tiene message_id, aún así puede ser válida
+          // Instagram a veces acepta mensajes pero no devuelve el ID inmediatamente
+          if (response.status === 200 && (data.success === true || data.result === "success")) {
+            console.log("[Instagram] Mensaje aceptado por Instagram (sin message_id en respuesta)")
+            // Generar un ID temporal o usar el timestamp
+            const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(7)}`
+            return {
+              success: true,
+              data: { externalId: tempId }
+            }
+          }
+
+          const error = createAdapterError(
+            ErrorType.API,
+            `Instagram no devolvió un ID de mensaje válido. Respuesta: ${JSON.stringify(data)}`,
+            { 
+              originalError: data,
+              details: { 
+                channelId, 
+                response: data,
+                status: response.status,
+                responseKeys: Object.keys(data)
+              }
+            }
+          )
+          logAdapterError("Instagram", "sendMessage", error, channelId)
+          return { success: false, error }
+        }
+
+        console.log(`[Instagram] Mensaje enviado exitosamente con ID: ${messageId}`)
+        return {
+          success: true,
+          data: { externalId: messageId }
+        }
+      } catch (axiosError: any) {
+        // Manejar errores de axios
+        if (axiosError.code === 'ECONNABORTED' || axiosError.message?.includes('timeout')) {
+          const timeoutError = createAdapterError(
+            ErrorType.NETWORK,
+            "Timeout: La API de Instagram tardó demasiado en responder",
+            { details: { channelId, timeout: 30000 } }
+          )
+          logAdapterError("Instagram", "sendMessage", timeoutError, channelId)
+          return { success: false, error: timeoutError }
+        }
+
+        if (axiosError.response) {
+          // Error de respuesta HTTP
+          const errorData = axiosError.response.data || {}
+          console.error("[Instagram] Error de respuesta HTTP:", {
+            status: axiosError.response.status,
+            error: errorData,
+            pageId,
+            threadExternalId: message.threadExternalId
+          })
+          
+          const adapterError = analyzeMetaError(errorData, "Instagram", "sendMessage")
+          logAdapterError("Instagram", "sendMessage", adapterError, channelId, {
+            statusCode: axiosError.response.status,
+            threadExternalId: message.threadExternalId,
+            messageLength: message.body.length,
+            errorData
+          })
+          return { success: false, error: adapterError }
+        }
+
+        // Error de red u otro error
+        throw axiosError // Re-throw para que lo maneje el catch exterior
       }
     } catch (error) {
       const adapterError = analyzeApiError(error, "Instagram", "sendMessage")
@@ -349,6 +489,44 @@ export class MetaInstagramAdapter implements ChannelAdapter {
         }
       }
 
+      // Detectar si está usando Instagram Business Account ID en lugar de Facebook Page ID
+      // Los Instagram Business Account IDs suelen empezar con 17 o 18 y tener 17-18 dígitos
+      // Los Facebook Page IDs suelen tener menos dígitos o un formato diferente
+      const isLikelyInstagramAccountId = pageId.length >= 17 && (pageId.startsWith('17') || pageId.startsWith('18'))
+      
+      if (isLikelyInstagramAccountId) {
+        // Intentar obtener el Page ID desde el Instagram Business Account
+        try {
+          const instagramResponse = await fetch(
+            `https://graph.facebook.com/v18.0/${pageId}?fields=id,name&access_token=${accessToken}`,
+            {
+              method: "GET",
+            }
+          )
+          
+          if (instagramResponse.ok) {
+            // Si funciona, es un Instagram Business Account ID
+            // Necesitamos encontrar el Facebook Page ID asociado
+            const instagramData = await instagramResponse.json()
+            
+            // Intentar obtener la página de Facebook asociada
+            // Esto requiere permisos adicionales, pero podemos intentar
+            const error = createAdapterError(
+              ErrorType.VALIDATION,
+              `El ID proporcionado (${pageId}) es un Instagram Business Account ID, no un Facebook Page ID. Para Instagram necesitas el ID de la página de Facebook vinculada a tu cuenta de Instagram Business. Puedes encontrarlo en: Configuración de la app → Instagram → Configuración de la API → donde aparece tu cuenta de Instagram, busca el "Page ID" asociado.`,
+              { details: { providedId: pageId, instagramAccountId: instagramData.id } }
+            )
+            logAdapterError("Instagram", "validateCredentials", error)
+            return {
+              valid: false,
+              error: error.message,
+            }
+          }
+        } catch (e) {
+          // Continuar con la validación normal
+        }
+      }
+
       // Verificar que el Page ID sea válido y tenga permisos de Instagram
       const response = await fetch(
         `https://graph.facebook.com/v18.0/${pageId}?fields=id,name,instagram_business_account`,
@@ -365,12 +543,21 @@ export class MetaInstagramAdapter implements ChannelAdapter {
         const adapterError = analyzeMetaError(errorData, "Instagram", "validateCredentials")
         logAdapterError("Instagram", "validateCredentials", adapterError, undefined, {
           statusCode: response.status,
-          pageId
+          pageId,
+          errorData
         })
+        
+        // Mensaje más descriptivo para errores comunes
+        let errorMessage = adapterError.message
+        if (errorData.error?.code === 190) {
+          errorMessage = "Token de acceso inválido. Por favor, genera un nuevo token desde el panel de Meta (Instagram → Generar token) o verifica que el token tenga permisos de Instagram."
+        } else if (errorData.error?.code === 100 && errorData.error?.message?.includes("page")) {
+          errorMessage = `Page ID inválido o no encontrado. Verifica que el Page ID (${pageId}) sea correcto y pertenezca a tu cuenta.`
+        }
         
         return {
           valid: false,
-          error: adapterError.message,
+          error: errorMessage,
         }
       }
 

@@ -17,6 +17,7 @@ import {
 import { verifyMetaWebhook } from "@/lib/webhook-verification"
 import { MediaMappingService } from "@/lib/media-mapping"
 import { ChannelCredentialsService } from "@/lib/channel-credentials"
+import axios from "axios"
 
 export class WhatsAppCloudAdapter implements ChannelAdapter {
   type = "whatsapp"
@@ -41,16 +42,24 @@ export class WhatsAppCloudAdapter implements ChannelAdapter {
 
   async ingestWebhook(payload: any, channelId: string): Promise<MessageDTO | null> {
     try {
-      if (payload.object !== "whatsapp_business_account") return null
+      if (payload.object !== "whatsapp_business_account") {
+        return null
+      }
 
       const entry = payload.entry?.[0]
-      if (!entry) return null
+      if (!entry) {
+        return null
+      }
 
       const change = entry.changes?.[0]
-      if (!change || change.field !== "messages") return null
+      if (!change || change.field !== "messages") {
+        return null
+      }
 
       const message = change.value?.messages?.[0]
-      if (!message) return null
+      if (!message) {
+        return null
+      }
 
       const attachments: Attachment[] = []
 
@@ -126,6 +135,15 @@ export class WhatsAppCloudAdapter implements ChannelAdapter {
     try {
       const { phoneId, accessToken } = credentials
 
+      console.log("[WhatsApp] Enviando mensaje:", {
+        channelId,
+        phoneId,
+        hasAccessToken: !!accessToken,
+        accessTokenLength: accessToken?.length,
+        threadExternalId: message.threadExternalId,
+        messageLength: message.body.length
+      })
+
       // Validar que existan las credenciales necesarias
       if (!phoneId || !accessToken) {
         const error = createAdapterError(
@@ -148,10 +166,30 @@ export class WhatsAppCloudAdapter implements ChannelAdapter {
         return { success: false, error }
       }
 
+      // Normalizar el número de teléfono para WhatsApp
+      // WhatsApp espera el formato: código de país + número sin el 9 inicial (ej: 543513989965)
+      // Pero cuando recibimos mensajes, WhatsApp nos da formato con 9 inicial (ej: 5493513989965)
+      // Necesitamos convertir de 5493513989965 a 543513989965 (quitar el 9 después del código de país)
+      let phoneNumber = String(message.threadExternalId || '').trim()
+      
+      // Si el número tiene 13 dígitos y empieza con 549, quitar el 9 después del código de país
+      // Formato recibido: 5493513989965 (13 dígitos) -> Formato esperado: 543513989965 (12 dígitos)
+      if (phoneNumber.length === 13 && phoneNumber.startsWith('549')) {
+        phoneNumber = '54' + phoneNumber.substring(3)
+        console.log(`[WhatsApp] Número normalizado: ${message.threadExternalId} → ${phoneNumber}`)
+      } else if (phoneNumber.length > 12 && phoneNumber.startsWith('54')) {
+        // Si tiene más de 12 dígitos y empieza con 54, intentar quitar el 9 después del código de país
+        const digitsOnly = phoneNumber.replace(/\D/g, '')
+        if (digitsOnly.length === 13 && digitsOnly.startsWith('549')) {
+          phoneNumber = '54' + digitsOnly.substring(3)
+          console.log(`[WhatsApp] Número normalizado: ${message.threadExternalId} → ${phoneNumber}`)
+        }
+      }
+      
       // Preparar el payload del mensaje
       let messagePayload: any = {
         messaging_product: "whatsapp",
-        to: message.threadExternalId,
+        to: phoneNumber,
       }
 
       // Si hay adjuntos, enviar el primer adjunto como mensaje principal
@@ -200,48 +238,91 @@ export class WhatsAppCloudAdapter implements ChannelAdapter {
         }
       }
 
-      // Enviar mensaje usando WhatsApp Cloud API
-      const response = await fetch(
-        `https://graph.facebook.com/v18.0/${phoneId}/messages`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify(messagePayload),
-        }
-      )
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const adapterError = analyzeMetaError(errorData, "WhatsApp", "sendMessage")
-        logAdapterError("WhatsApp", "sendMessage", adapterError, channelId, {
-          statusCode: response.status,
-          threadExternalId: message.threadExternalId,
-          messageLength: message.body.length
-        })
-        return { success: false, error: adapterError }
-      }
-
-      const data = await response.json()
-      
-      if (!data.messages?.[0]?.id) {
-        const error = createAdapterError(
-          ErrorType.API,
-          "WhatsApp no devolvió un ID de mensaje válido",
-          { 
-            originalError: data,
-            details: { channelId, response: data }
+      // Enviar mensaje usando WhatsApp Cloud API con axios
+      try {
+        const response = await axios.post(
+          `https://graph.facebook.com/v22.0/${phoneId}/messages`,
+          messagePayload,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+              "User-Agent": "MessageHub/1.0",
+            },
+            timeout: 30000, // 30 segundos timeout
+            validateStatus: (status) => status < 500, // No lanzar error para códigos 4xx
           }
         )
-        logAdapterError("WhatsApp", "sendMessage", error, channelId)
-        return { success: false, error }
-      }
 
-      return { 
-        success: true, 
-        data: { externalId: data.messages[0].id }
+        if (response.status >= 400) {
+          const errorData = response.data || {}
+          console.error("[WhatsApp] Error de API:", {
+            status: response.status,
+            error: errorData,
+            phoneId,
+            threadExternalId: message.threadExternalId
+          })
+          
+          const adapterError = analyzeMetaError(errorData, "WhatsApp", "sendMessage")
+          logAdapterError("WhatsApp", "sendMessage", adapterError, channelId, {
+            statusCode: response.status,
+            threadExternalId: message.threadExternalId,
+            messageLength: message.body.length,
+            errorData
+          })
+          return { success: false, error: adapterError }
+        }
+
+        const data = response.data
+
+        console.log("[WhatsApp] Respuesta de API:", JSON.stringify(data, null, 2))
+
+        if (!data.messages?.[0]?.id) {
+          const error = createAdapterError(
+            ErrorType.API,
+            "WhatsApp no devolvió un ID de mensaje válido",
+            { 
+              originalError: data,
+              details: { channelId, response: data }
+            }
+          )
+          logAdapterError("WhatsApp", "sendMessage", error, channelId)
+          return { success: false, error }
+        }
+
+        console.log(`[WhatsApp] Mensaje enviado exitosamente: ${data.messages[0].id}`)
+        return {
+          success: true,
+          data: { externalId: data.messages[0].id }
+        }
+      } catch (axiosError: any) {
+        // Manejar errores de axios
+        if (axiosError.code === 'ECONNABORTED' || axiosError.message?.includes('timeout')) {
+          const timeoutError = createAdapterError(
+            ErrorType.NETWORK,
+            "Timeout: La API de WhatsApp tardó demasiado en responder",
+            { details: { channelId, timeout: 30000 } }
+          )
+          logAdapterError("WhatsApp", "sendMessage", timeoutError, channelId)
+          return { success: false, error: timeoutError }
+        }
+
+        if (axiosError.response) {
+          // Error de respuesta HTTP
+          const errorData = axiosError.response.data || {}
+          const adapterError = analyzeMetaError(errorData, "WhatsApp", "sendMessage")
+          logAdapterError("WhatsApp", "sendMessage", adapterError, channelId, {
+            statusCode: axiosError.response.status,
+            threadExternalId: message.threadExternalId,
+            messageLength: message.body.length,
+            errorData
+          })
+          return { success: false, error: adapterError }
+        }
+
+        // Error de red u otro error
+        throw axiosError // Re-throw para que lo maneje el catch exterior
       }
     } catch (error) {
       const adapterError = analyzeApiError(error, "WhatsApp", "sendMessage")

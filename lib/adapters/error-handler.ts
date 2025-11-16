@@ -206,6 +206,22 @@ export function analyzeMetaError(
         }
       )
 
+    case 10: // Message sent outside allowed time window (Instagram 24-hour window)
+      return createAdapterError(
+        ErrorType.PERMISSION_DENIED,
+        `No se puede enviar el mensaje: Instagram solo permite enviar mensajes a usuarios que han enviado un mensaje en las últimas 24 horas. El usuario debe enviar un mensaje nuevo para que puedas responder.`,
+        {
+          originalError: errorData,
+          retryable: false,
+          details: { 
+            context, 
+            platform, 
+            errorCode,
+            userMessage: "Este mensaje no se puede enviar porque han pasado más de 24 horas desde el último mensaje del usuario. Esperá a que el usuario envíe un mensaje nuevo para poder responder."
+          }
+        }
+      )
+
     default:
       return createAdapterError(
         ErrorType.API,

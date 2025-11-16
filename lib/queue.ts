@@ -45,34 +45,11 @@ export const messageWorker = new Worker<SendMessageJob>(
       
       if (channel.type === "FACEBOOK" || channel.type === "INSTAGRAM") {
         const meta = channel.meta as any
-        // Intentar obtener credenciales desencriptadas primero
-        try {
-          const { getDecryptedChannelCredentials } = await import("@/lib/encrypted-credentials")
-          const credentialsResult = await getDecryptedChannelCredentials({
-            channelId,
-            tenantId: channel.local.tenantId,
-          })
-          
-          if (credentialsResult.success && credentialsResult.credentials) {
-            const metaCreds = credentialsResult.credentials as any
-            adapterCredentials = {
-              pageId: metaCreds.pageId || meta?.pageId,
-              accessToken: metaCreds.pageAccessToken || metaCreds.accessToken || meta?.accessToken,
-            }
-          } else {
-            // Fallback: usar credenciales directamente de meta
-            adapterCredentials = {
-              pageId: meta?.pageId || meta?.credentials?.pageId,
-              accessToken: meta?.accessToken || meta?.credentials?.pageAccessToken || meta?.credentials?.accessToken,
-            }
-          }
-        } catch (error) {
-          // Si falla la desencriptación, usar credenciales directamente de meta
-          const meta = channel.meta as any
-          adapterCredentials = {
-            pageId: meta?.pageId || meta?.credentials?.pageId,
-            accessToken: meta?.accessToken || meta?.credentials?.pageAccessToken || meta?.credentials?.accessToken,
-          }
+        // Usar credenciales directamente de meta (no podemos usar getDecryptedChannelCredentials aquí
+        // porque requiere un contexto de request y estamos en un worker)
+        adapterCredentials = {
+          pageId: meta?.pageId || meta?.credentials?.pageId,
+          accessToken: meta?.accessToken || meta?.credentials?.pageAccessToken || meta?.credentials?.accessToken,
         }
       } else if (channel.type === "WHATSAPP") {
         const meta = channel.meta as any
@@ -92,19 +69,55 @@ export const messageWorker = new Worker<SendMessageJob>(
 
       console.log(`[Queue] Procesando mensaje ${messageId} para canal ${channelId} (${channel.type})`)
 
+      // Para Instagram, verificar si el último mensaje entrante es muy reciente
+      // Si es así, esperar un poco para asegurar que Instagram lo haya registrado
+      if (channel.type === "INSTAGRAM") {
+        const thread = await prisma.thread.findFirst({
+          where: {
+            channelId: channelId,
+            externalId: message.threadExternalId
+          },
+          select: { id: true }
+        })
+
+        if (thread) {
+          const lastInboundMessage = await prisma.message.findFirst({
+            where: {
+              threadId: thread.id,
+              direction: "INBOUND",
+              channelId: channelId
+            },
+            orderBy: { sentAt: "desc" },
+            select: { sentAt: true }
+          })
+
+          if (lastInboundMessage) {
+            const timeSinceLastMessage = Date.now() - lastInboundMessage.sentAt.getTime()
+            const secondsSinceLastMessage = timeSinceLastMessage / 1000
+            
+            // Si el último mensaje entrante es muy reciente (menos de 30 segundos), esperar un poco más
+            // Instagram puede necesitar más tiempo para registrar el mensaje en su sistema
+            if (secondsSinceLastMessage < 30) {
+              const waitTime = Math.ceil(30 - secondsSinceLastMessage) * 1000
+              console.log(`[Queue] Instagram: Esperando ${(waitTime/1000).toFixed(1)}s antes de enviar`)
+              await new Promise(resolve => setTimeout(resolve, waitTime))
+            }
+          }
+        }
+      }
+
       const result = await adapter.sendMessage(channelId, message, adapterCredentials)
 
       if (result.success && result.data) {
-        console.log(`[Queue] Mensaje ${messageId} enviado exitosamente, actualizando con externalId: ${result.data.externalId}`)
         await prisma.message.update({
           where: { id: messageId },
           data: {
             externalId: result.data.externalId,
             deliveredAt: new Date(),
-            failedReason: null, // Limpiar cualquier error anterior
+            failedReason: null,
           },
         })
-        console.log(`[Queue] Mensaje ${messageId} actualizado exitosamente`)
+        console.log(`[Queue] Mensaje ${messageId} enviado exitosamente`)
       } else {
         // Extraer información del error para logging
         const errorMessage = result.error?.message || "Error desconocido"

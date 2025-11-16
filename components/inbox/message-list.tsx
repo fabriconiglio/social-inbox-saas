@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils"
 import { PdfAttachmentSimple, PdfViewerSimple } from "./pdf-viewer-simple"
 import { TextHighlight } from "@/components/ui/text-highlight"
 import { useAdvancedFilters } from "@/hooks/use-advanced-filters"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { AlertCircle } from "lucide-react"
 
 interface MessageListProps {
   threadId: string
@@ -106,10 +108,26 @@ export function MessageList({ threadId, tenantId }: MessageListProps) {
                 )}
               </div>
 
-              <span className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(message.sentAt), { addSuffix: true, locale: es })}
-                {message.failedReason && <span className="ml-2 text-destructive">• Falló</span>}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {formatDistanceToNow(new Date(message.sentAt), { addSuffix: true, locale: es })}
+                </span>
+                {message.failedReason && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex items-center gap-1 text-xs text-destructive cursor-help">
+                          <AlertCircle className="h-3 w-3" />
+                          Falló
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-sm">{message.failedReason}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
             </div>
           </div>
         )

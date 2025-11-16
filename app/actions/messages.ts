@@ -76,14 +76,23 @@ export async function sendMessage(data: z.infer<typeof sendMessageSchema>) {
       select: { type: true, displayName: true }
     })
 
-    const contact = await prisma.contact.findUnique({
+    const contact = thread.contactId ? await prisma.contact.findUnique({
       where: { id: thread.contactId },
       select: { name: true, handle: true }
-    })
+    }) : null
 
     // Enviar mensaje a través del adapter del canal (de forma asíncrona usando cola)
     if (channel && channel.type !== "MOCK") {
       try {
+        console.log(`[Send Message] Preparando mensaje para canal ${channel.type}:`, {
+          threadId: thread.id,
+          threadExternalId: thread.externalId,
+          contactHandle: contact?.handle,
+          channelType: channel.type,
+          messageLength: data.content.length,
+          lastMessageAt: thread.lastMessageAt
+        })
+
         // Preparar el mensaje para el adapter
         const sendMessageDTO = {
           body: data.content,

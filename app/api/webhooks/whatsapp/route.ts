@@ -42,17 +42,21 @@ export async function POST(request: NextRequest) {
     // Verificar firma HMAC
     if (signature) {
       // Obtener webhook secret desde variables de entorno
-      const webhookSecret = process.env.WHATSAPP_WEBHOOK_SECRET || process.env.META_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET
+      // WhatsApp usa el App Secret para la verificación HMAC
+      const webhookSecret = process.env.WHATSAPP_WEBHOOK_SECRET || process.env.META_APP_SECRET || process.env.META_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET
       
-      const isValid = adapter.verifyWebhook(payloadString, signature, webhookSecret)
-      logWebhookVerification("WhatsApp", isValid, signature, payloadString.length)
-      
-      if (!isValid) {
-        console.error("[WhatsApp] Webhook verification failed - rejecting request")
-        return NextResponse.json({ error: "Invalid signature" }, { status: 403 })
+      if (!webhookSecret) {
+        if (process.env.NODE_ENV !== "development") {
+          return NextResponse.json({ error: "Webhook secret not configured" }, { status: 403 })
+        }
+      } else {
+        const isValid = adapter.verifyWebhook(payloadString, signature, webhookSecret)
+        logWebhookVerification("WhatsApp", isValid, signature, payloadString.length)
+        
+        if (!isValid && process.env.NODE_ENV !== "development") {
+          return NextResponse.json({ error: "Invalid signature" }, { status: 403 })
+        }
       }
-    } else {
-      console.warn("[WhatsApp] No signature provided - skipping verification")
     }
 
     const channels = await prisma.channel.findMany({
