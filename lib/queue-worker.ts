@@ -4,6 +4,13 @@
  * para procesar jobs de mensajes y SLA en producción
  */
 
+// Cargar variables de entorno desde .env antes de importar cualquier módulo
+import { config } from "dotenv"
+import { resolve } from "path"
+
+// Cargar .env desde la raíz del proyecto
+config({ path: resolve(process.cwd(), ".env") })
+
 import { messageWorker, slaWorker } from "./queue"
 
 console.log("[Queue Worker] Iniciando workers de BullMQ...")
